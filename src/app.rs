@@ -1,4 +1,4 @@
-use std::sync::mpsc;
+use tokio::sync::mpsc;
 
 use crate::renderer::{Renderer, State};
 
@@ -17,13 +17,20 @@ where
 
         Self { receiver, renderer }
     }
+
+    pub async fn run(&mut self) {
+        while let Some(value) = self.receiver.recv().await {
+            self.renderer.render(&State);
+        }
+    }
 }
 
 #[cfg(test)]
 mod should {
-    use std::sync::mpsc;
+    use std::time::Duration;
 
     use mockall::predicate::*;
+    use tokio::{sync::mpsc, task};
 
     use super::*;
 
@@ -33,7 +40,7 @@ mod should {
     fn render_frame_on_startup() {
         let expected_state = State;
 
-        let (_, receiver) = mpsc::channel();
+        let (_, receiver) = mpsc::channel(1);
 
         let mut renderer_mock = MockRenderer::new();
 
@@ -46,6 +53,30 @@ mod should {
         let _ = App::new(receiver, renderer_mock);
     }
 
-    #[test]
-    fn render_frame_on_update() {}
+    #[tokio::test]
+    async fn render_frame_on_update() {
+        let expected_state = State;
+
+        let (sender, receiver) = mpsc::channel(1);
+
+        let mut renderer_mock = MockRenderer::new();
+
+        renderer_mock
+            .expect_render()
+            .times(2)
+            .with(eq(expected_state))
+            .return_const(());
+
+        let mut tested_app = App::new(receiver, renderer_mock);
+
+        task::spawn(async move {
+            sender.send(()).await.unwrap();
+        });
+
+        tokio::time::timeout(Duration::from_millis(100), async move {
+            tested_app.run().await;
+        })
+        .await
+        .unwrap();
+    }
 }
