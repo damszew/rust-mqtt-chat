@@ -1,2 +1,3 @@
 pub mod app;
-mod renderer;
+pub mod renderer;
+mod ui;

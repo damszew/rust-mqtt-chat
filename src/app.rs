@@ -48,7 +48,7 @@ mod should {
             .expect_render()
             .times(1)
             .with(eq(expected_state))
-            .return_const(());
+            .returning(|_| Ok(()));
 
         let _ = App::new(receiver, renderer_mock);
     }
@@ -65,7 +65,7 @@ mod should {
             .expect_render()
             .times(2)
             .with(eq(expected_state))
-            .return_const(());
+            .returning(|_| Ok(()));
 
         let mut tested_app = App::new(receiver, renderer_mock);
 
