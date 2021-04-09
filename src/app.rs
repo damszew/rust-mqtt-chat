@@ -2,7 +2,7 @@ use tokio::sync::mpsc;
 
 use crate::renderer::{Renderer, State};
 
-struct App<R> {
+pub struct App<R> {
     receiver: mpsc::Receiver<()>,
     renderer: R,
 }
@@ -12,14 +12,14 @@ where
     R: Renderer,
 {
     pub fn new(receiver: mpsc::Receiver<()>, mut renderer: R) -> Self {
-        let state = State;
+        let state = State::default();
         renderer.render(&state);
 
         Self { receiver, renderer }
     }
 
     pub async fn run(&mut self) {
-        while let Some(value) = self.receiver.recv().await {
+        while let Some(_) = self.receiver.recv().await {
             self.renderer.render(&State);
         }
     }
@@ -38,7 +38,7 @@ mod should {
 
     #[test]
     fn render_frame_on_startup() {
-        let expected_state = State;
+        let expected_state = State::default();
 
         let (_, receiver) = mpsc::channel(1);
 
@@ -55,7 +55,7 @@ mod should {
 
     #[tokio::test]
     async fn render_frame_on_update() {
-        let expected_state = State;
+        let expected_state = State::default();
 
         let (sender, receiver) = mpsc::channel(1);
 

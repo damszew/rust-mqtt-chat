@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq)]
 pub struct State;
 
 #[cfg(test)]
