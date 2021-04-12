@@ -13,14 +13,14 @@ where
 {
     pub fn new(receiver: mpsc::Receiver<()>, mut renderer: R) -> Self {
         let state = State::default();
-        renderer.render(&state);
+        renderer.render(&state).unwrap();
 
         Self { receiver, renderer }
     }
 
     pub async fn run(&mut self) {
         while let Some(_) = self.receiver.recv().await {
-            self.renderer.render(&State);
+            self.renderer.render(&State::default()).unwrap();
         }
     }
 }
