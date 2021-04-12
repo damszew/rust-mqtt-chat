@@ -10,7 +10,9 @@ edition = "2018"
 tokio = { version = "1", features = ["full"] }
 tui = { version = "0.14.0", default-features = false, features = ["crossterm"] }
 anyhow = "1"
-crossterm = "0.19"
+crossterm = { version = "0.19", default-features = false, features = ["event-stream"] }
+async-trait = "0.1.48"
+futures = "0.3.14"
 
 [dev-dependencies]
 mockall = "0.9.1"
