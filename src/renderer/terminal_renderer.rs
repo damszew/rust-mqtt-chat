@@ -4,9 +4,7 @@ use anyhow::Result;
 use crossterm::{terminal, ExecutableCommand};
 use tui::{backend::CrosstermBackend, Terminal};
 
-use crate::ui;
-
-use super::{Renderer, State};
+use super::{ui, Renderer, State};
 
 pub struct TerminalRenderer<W: Write> {
     terminal: Terminal<CrosstermBackend<W>>,

@@ -1,3 +1,5 @@
+mod ui;
+
 use anyhow::Result;
 
 pub mod terminal_renderer;
