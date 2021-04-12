@@ -1,0 +1,44 @@
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+name: CI
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/cargo@v1
+        with:
+          command: check
+
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/clippy-check@v1
+        with:
+          name: clippy results
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: -- -D warnings
+
+  test:
+    needs: [check, fmt, clippy]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
