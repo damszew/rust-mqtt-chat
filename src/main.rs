@@ -1,27 +1,26 @@
-use std::thread::sleep;
-
 use actor_model_chat::{
+    app::App,
     events_handler::{crossterm_events_handler::CrosstermEventsHandler, EventHandler},
-    renderer::{terminal_renderer::TerminalRenderer, Renderer, State},
+    renderer::terminal_renderer::TerminalRenderer,
 };
 use anyhow::Result;
-use tokio::sync::mpsc;
+use tokio::try_join;
+use tokio::{sync::mpsc, task};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut renderer = TerminalRenderer::new(std::io::stdout())?;
+    let renderer = TerminalRenderer::new(std::io::stdout())?;
 
-    let (s, r) = mpsc::channel(1);
+    let (sender, receiver) = mpsc::channel(1);
+    let mut events_handler = CrosstermEventsHandler::new(sender);
+    let mut app = App::new(receiver, renderer);
 
-    let mut events_handler = CrosstermEventsHandler::new(s);
+    let event_task = task::spawn(async move { events_handler.dispatch_events().await });
+    let app_task = task::spawn(async move { app.run().await });
 
-    events_handler.dispatch_events().await?;
-
-    let state = State::default();
-
-    renderer.render(&state)?;
-
-    sleep(std::time::Duration::from_secs(2));
+    let results = try_join!(event_task, app_task)?;
+    results.0?;
+    results.1?;
 
     Ok(())
 }

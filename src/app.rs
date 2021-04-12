@@ -1,3 +1,4 @@
+use anyhow::Result;
 use tokio::sync::mpsc;
 
 use crate::renderer::{Renderer, State};
@@ -18,10 +19,12 @@ where
         Self { receiver, renderer }
     }
 
-    pub async fn run(&mut self) {
+    pub async fn run(&mut self) -> Result<()> {
         while let Some(_) = self.receiver.recv().await {
             self.renderer.render(&State::default()).unwrap();
         }
+
+        Ok(())
     }
 }
 
@@ -74,7 +77,7 @@ mod should {
         });
 
         tokio::time::timeout(Duration::from_millis(100), async move {
-            tested_app.run().await;
+            tested_app.run().await.unwrap();
         })
         .await
         .unwrap();
