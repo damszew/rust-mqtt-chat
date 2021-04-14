@@ -1,5 +1,4 @@
-use crossterm::event::EventStream;
-use crossterm::event::{Event, KeyCode, KeyEvent};
+use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyModifiers};
 use futures::{Stream, StreamExt};
 use tokio::sync::mpsc;
 
@@ -31,15 +30,21 @@ where
     S: Stream<Item = crossterm::Result<Event>> + Unpin + Send,
 {
     async fn dispatch_events(&mut self) -> anyhow::Result<()> {
-        while let Some(Ok(event)) = self.event_stream.next().await {
+        while let Some(event) = self.event_stream.next().await {
+            let event = event?;
             match event {
-                Event::Key(KeyEvent { code, modifiers: _ }) => match code {
+                Event::Key(KeyEvent { code, modifiers }) => match code {
                     KeyCode::Esc => {
                         self.sender.send(AppEvent::Quit).await?;
                         break;
                     }
                     KeyCode::Char(c) => {
-                        self.sender.send(AppEvent::Character(c)).await?;
+                        if c == 'c' && modifiers == KeyModifiers::CONTROL {
+                            self.sender.send(AppEvent::Quit).await?;
+                            break;
+                        } else {
+                            self.sender.send(AppEvent::Character(c)).await?;
+                        }
                     }
                     _ => {
                         todo!("Handle other KeyCodes")
@@ -57,42 +62,20 @@ where
 #[cfg(test)]
 mod tests {
     use crossterm::event::KeyModifiers;
-    use pretty_assertions::assert_eq;
+    use test_case::test_case;
 
     use super::*;
     use crate::AppEvent;
 
+    #[test_case( KeyCode::Esc, KeyModifiers::NONE ; "on esc")]
+    #[test_case( KeyCode::Char('c'), KeyModifiers::CONTROL ; "on ctrl c")]
     #[tokio::test]
-    async fn quit_on_esc() {
-        let stream = tokio_stream::iter(vec![Ok(Event::Key(KeyEvent::new(
-            KeyCode::Esc,
-            KeyModifiers::NONE,
-        )))]);
-
-        let (sender, mut receiver) = mpsc::channel(1);
-        let mut tested_event_handler = CrosstermEventsHandler {
-            event_stream: stream,
-            sender,
-        };
-
-        tested_event_handler.dispatch_events().await.unwrap();
-
-        let event = tokio::time::timeout(std::time::Duration::from_millis(100), async move {
-            receiver.recv().await.unwrap()
-        })
-        .await
-        .unwrap();
-
-        assert_eq!(event, AppEvent::Quit);
-    }
-
-    #[tokio::test]
-    async fn shutdown_on_esc() {
+    async fn quit_and_shutdown(exit_key: KeyCode, modifier: KeyModifiers) {
         let stream = tokio_stream::iter(vec![
-            Ok(Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE))),
-            Ok(Event::Key(KeyEvent::new(
-                KeyCode::Char('a'),
-                KeyModifiers::NONE,
+            Ok(Event::Key(KeyEvent::new(exit_key, modifier))),
+            Err(crossterm::ErrorKind::IoError(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "oh no!",
             ))),
         ]);
 
