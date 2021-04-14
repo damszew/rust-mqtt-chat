@@ -1,10 +1,13 @@
 use anyhow::Result;
 use tokio::sync::mpsc;
 
-use crate::renderer::{Renderer, State};
+use crate::{
+    renderer::{Renderer, State},
+    AppEvent,
+};
 
 pub struct App<R> {
-    receiver: mpsc::Receiver<()>,
+    receiver: mpsc::Receiver<AppEvent>,
     renderer: R,
 }
 
@@ -12,7 +15,7 @@ impl<R> App<R>
 where
     R: Renderer,
 {
-    pub fn new(receiver: mpsc::Receiver<()>, mut renderer: R) -> Self {
+    pub fn new(receiver: mpsc::Receiver<AppEvent>, mut renderer: R) -> Self {
         let state = State::default();
         renderer.render(&state).unwrap();
 
@@ -20,8 +23,15 @@ where
     }
 
     pub async fn run(&mut self) -> Result<()> {
-        while let Some(_) = self.receiver.recv().await {
-            self.renderer.render(&State::default()).unwrap();
+        while let Some(event) = self.receiver.recv().await {
+            match event {
+                AppEvent::Quit => {
+                    break;
+                }
+                AppEvent::Character(_) => {
+                    self.renderer.render(&State::default()).unwrap();
+                }
+            }
         }
 
         Ok(())
@@ -73,7 +83,32 @@ mod should {
         let mut tested_app = App::new(receiver, renderer_mock);
 
         task::spawn(async move {
-            sender.send(()).await.unwrap();
+            sender.send(AppEvent::Character('c')).await.unwrap();
+        });
+
+        tokio::time::timeout(Duration::from_millis(100), async move {
+            tested_app.run().await.unwrap();
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn exit_loop_on_quit() {
+        let (sender, receiver) = mpsc::channel(1);
+
+        let mut renderer_mock = MockRenderer::new();
+        renderer_mock
+            .expect_render()
+            .times(1) // only start-up render
+            .with(eq(State::default()))
+            .returning(|_| Ok(()));
+
+        let mut tested_app = App::new(receiver, renderer_mock);
+
+        let test_sender = sender.clone();
+        task::spawn(async move {
+            test_sender.send(AppEvent::Quit).await.unwrap();
         });
 
         tokio::time::timeout(Duration::from_millis(100), async move {

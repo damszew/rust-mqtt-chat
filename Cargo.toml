@@ -17,3 +17,4 @@ futures = "0.3.14"
 [dev-dependencies]
 mockall = "0.9.1"
 tokio-stream = "0.1.5"
+pretty_assertions = "0.7.1"
