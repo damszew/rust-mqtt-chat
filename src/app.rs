@@ -31,6 +31,7 @@ where
                 AppEvent::Character(_) => {
                     self.renderer.render(&State::default()).unwrap();
                 }
+                _ => todo!(),
             }
         }
 

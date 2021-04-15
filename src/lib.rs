@@ -6,4 +6,13 @@ pub mod renderer;
 pub enum AppEvent {
     Quit,
     Character(char),
+    Accept,
+    Remove,
+    RemoveLast,
+    CursorLeft,
+    CursorRight,
+    CursorStart,
+    CursorEnd,
+    ScrollUp,
+    ScrollDown,
 }
