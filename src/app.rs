@@ -42,6 +42,10 @@ where
                     self.state.messages.push(msg);
                     self.renderer.render(&self.state)?;
                 }
+                AppEvent::RemoveLast => {
+                    self.state.input_message.pop();
+                    self.renderer.render(&self.state)?;
+                }
                 _ => todo!(),
             }
         }
@@ -117,6 +121,55 @@ mod should {
             State {
                 input_message: "".into(),
                 messages: vec!["me".into()],
+                ..Default::default()
+            },
+        ];
+
+        let mut seq = Sequence::new();
+        let mut renderer_mock = setup_rendered_mock();
+        for s in expected_states {
+            renderer_mock
+                .expect_render()
+                .times(1)
+                .with(eq(s))
+                .in_sequence(&mut seq)
+                .returning(|_| Ok(()));
+        }
+
+        let (sender, receiver) = mpsc::channel(1);
+        let mut tested_app = App::new(receiver, renderer_mock);
+
+        task::spawn(async move {
+            for event in events {
+                sender.send(event).await.unwrap();
+            }
+        });
+
+        tokio::time::timeout(Duration::from_millis(100), async move {
+            tested_app.run().await.unwrap();
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn remove_last_character() {
+        let events = vec![
+            AppEvent::Character('m'),
+            AppEvent::Character('e'),
+            AppEvent::RemoveLast,
+        ];
+        let expected_states = vec![
+            State {
+                input_message: "m".into(),
+                ..Default::default()
+            },
+            State {
+                input_message: "me".into(),
+                ..Default::default()
+            },
+            State {
+                input_message: "m".into(),
                 ..Default::default()
             },
         ];
