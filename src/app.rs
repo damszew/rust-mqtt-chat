@@ -59,6 +59,7 @@ mod should {
     use std::time::Duration;
 
     use mockall::{predicate::*, Sequence};
+    use test_case::test_case;
     use tokio::{sync::mpsc, task};
 
     use super::*;
@@ -73,43 +74,20 @@ mod should {
         let _ = App::new(receiver, renderer_mock);
     }
 
-    #[tokio::test]
-    async fn render_frame_on_update() {
-        let event = AppEvent::Character('c');
-        let expected_state = State {
+    #[test_case(
+        vec![AppEvent::Character('c')],
+        vec![State {
             input_message: "c".into(),
             ..Default::default()
-        };
-
-        let mut renderer_mock = setup_rendered_mock();
-        renderer_mock
-            .expect_render()
-            .times(1)
-            .with(eq(expected_state))
-            .returning(|_| Ok(()));
-
-        let (sender, receiver) = mpsc::channel(1);
-        let mut tested_app = App::new(receiver, renderer_mock);
-
-        task::spawn(async move {
-            sender.send(event).await.unwrap();
-        });
-
-        tokio::time::timeout(Duration::from_millis(100), async move {
-            tested_app.run().await.unwrap();
-        })
-        .await
-        .unwrap();
-    }
-
-    #[tokio::test]
-    async fn on_accept_push_input_to_messages() {
-        let events = vec![
+        }]
+        ; "single character")]
+    #[test_case(
+        vec![
             AppEvent::Character('m'),
             AppEvent::Character('e'),
             AppEvent::Accept,
-        ];
-        let expected_states = vec![
+        ],
+        vec![
             State {
                 input_message: "m".into(),
                 ..Default::default()
@@ -123,43 +101,15 @@ mod should {
                 messages: vec!["me".into()],
                 ..Default::default()
             },
-        ];
-
-        let mut seq = Sequence::new();
-        let mut renderer_mock = setup_rendered_mock();
-        for s in expected_states {
-            renderer_mock
-                .expect_render()
-                .times(1)
-                .with(eq(s))
-                .in_sequence(&mut seq)
-                .returning(|_| Ok(()));
-        }
-
-        let (sender, receiver) = mpsc::channel(1);
-        let mut tested_app = App::new(receiver, renderer_mock);
-
-        task::spawn(async move {
-            for event in events {
-                sender.send(event).await.unwrap();
-            }
-        });
-
-        tokio::time::timeout(Duration::from_millis(100), async move {
-            tested_app.run().await.unwrap();
-        })
-        .await
-        .unwrap();
-    }
-
-    #[tokio::test]
-    async fn remove_last_character() {
-        let events = vec![
+        ]
+        ; "on accept push input to messages")]
+    #[test_case(
+        vec![
             AppEvent::Character('m'),
             AppEvent::Character('e'),
             AppEvent::RemoveLast,
-        ];
-        let expected_states = vec![
+        ],
+        vec![
             State {
                 input_message: "m".into(),
                 ..Default::default()
@@ -172,8 +122,10 @@ mod should {
                 input_message: "m".into(),
                 ..Default::default()
             },
-        ];
-
+        ]
+        ; "remove last character")]
+    #[tokio::test]
+    async fn render_frame_on_update(events: Vec<AppEvent>, expected_states: Vec<State>) {
         let mut seq = Sequence::new();
         let mut renderer_mock = setup_rendered_mock();
         for s in expected_states {
