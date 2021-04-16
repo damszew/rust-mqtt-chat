@@ -13,6 +13,7 @@ anyhow = "1"
 crossterm = { version = "0.19", default-features = false, features = ["event-stream"] }
 async-trait = "0.1.48"
 futures = "0.3.14"
+chrono = "0.4.19"
 
 [dev-dependencies]
 mockall = "0.9.1"

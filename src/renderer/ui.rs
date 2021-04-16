@@ -65,7 +65,10 @@ fn draw_messages_panel(state: &State, frame: &mut Frame<impl Backend>, chunk: Re
         .messages
         .iter()
         .map(|message| {
-            let content = Spans::from(Span::raw(message));
+            let content = Spans::from(vec![
+                Span::raw(message.time.format("%H:%M:%S ").to_string()),
+                Span::raw(message.msg.clone()),
+            ]);
             content
         })
         .collect::<Vec<_>>();

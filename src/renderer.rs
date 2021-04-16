@@ -1,6 +1,7 @@
 mod ui;
 
 use anyhow::Result;
+use chrono::{DateTime, Local};
 
 pub mod terminal_renderer;
 
@@ -8,13 +9,40 @@ pub mod terminal_renderer;
 pub struct State {
     pub input_message: String,
     pub cursor: usize,
-    pub messages: Vec<String>,
+    pub messages: Vec<Message>,
 }
 
-#[cfg(test)]
-use mockall::automock;
+#[derive(Clone, Debug)]
+pub struct Message {
+    pub time: DateTime<Local>,
+    pub msg: String,
+}
 
-#[cfg_attr(test, automock)]
+impl Message {
+    pub fn new(msg: String) -> Self {
+        Self {
+            time: Local::now(),
+            msg,
+        }
+    }
+}
+impl PartialEq for Message {
+    fn eq(&self, other: &Self) -> bool {
+        self.time.format("%H:%M:%S ").to_string() == other.time.format("%H:%M:%S ").to_string()
+            && self.msg == other.msg
+    }
+}
+
+impl Default for Message {
+    fn default() -> Self {
+        Self {
+            time: Local::now(),
+            ..Default::default()
+        }
+    }
+}
+
+#[cfg_attr(test, mockall::automock)]
 pub trait Renderer {
     fn render(&mut self, state: &State) -> Result<()>;
 }

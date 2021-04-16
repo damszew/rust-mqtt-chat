@@ -2,7 +2,7 @@ use anyhow::Result;
 use tokio::sync::mpsc;
 
 use crate::{
-    renderer::{Renderer, State},
+    renderer::{Message, Renderer, State},
     AppEvent,
 };
 
@@ -39,8 +39,10 @@ where
                 }
                 AppEvent::Accept => {
                     let msg = self.state.input_message.drain(..).collect();
+                    let message = Message::new(msg);
+
                     self.state.cursor = 0;
-                    self.state.messages.push(msg);
+                    self.state.messages.push(message);
                 }
                 AppEvent::Remove => {
                     if self.state.cursor < self.state.input_message.len() {
@@ -133,7 +135,7 @@ mod should {
             State {
                 input_message: "".into(),
                 cursor: 0,
-                messages: vec!["me".into()],
+                messages: vec![ Message::new("me".into()) ],
                 ..Default::default()
             },
         ]
