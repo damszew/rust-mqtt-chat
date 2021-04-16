@@ -38,7 +38,7 @@ fn draw_input_panel(state: &State, frame: &mut Frame<impl Backend>, chunk: Rect)
     // Make the cursor visible and ask tui-rs to put it at the specified coordinates after rendering
     frame.set_cursor(
         // Put cursor past the end of the input text
-        chunk.x + state.input_message.len() as u16 + 1,
+        chunk.x + state.cursor as u16 + 1,
         // Move one line down, from the border to the input line
         chunk.y + 1,
     );

@@ -4,9 +4,10 @@ use anyhow::Result;
 
 pub mod terminal_renderer;
 
-#[derive(Default, Debug, PartialEq)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub struct State {
     pub input_message: String,
+    pub cursor: usize,
     pub messages: Vec<String>,
 }
 

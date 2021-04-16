@@ -35,19 +35,36 @@ where
                 }
                 AppEvent::Character(ch) => {
                     self.state.input_message.push(ch);
-                    self.renderer.render(&self.state)?;
+                    self.state.cursor += 1;
                 }
                 AppEvent::Accept => {
                     let msg = self.state.input_message.drain(..).collect();
+                    self.state.cursor = 0;
                     self.state.messages.push(msg);
-                    self.renderer.render(&self.state)?;
                 }
                 AppEvent::RemoveLast => {
                     self.state.input_message.pop();
-                    self.renderer.render(&self.state)?;
+                    self.state.cursor -= 1;
+                }
+                AppEvent::CursorStart => {
+                    self.state.cursor = 0;
+                }
+                AppEvent::CursorEnd => {
+                    self.state.cursor = self.state.input_message.len();
+                }
+                AppEvent::CursorRight => {
+                    if self.state.cursor < self.state.input_message.len() {
+                        self.state.cursor += 1;
+                    }
+                }
+                AppEvent::CursorLeft => {
+                    if self.state.cursor > 0 {
+                        self.state.cursor -= 1;
+                    }
                 }
                 _ => todo!(),
             }
+            self.renderer.render(&self.state)?;
         }
 
         Ok(())
@@ -78,6 +95,7 @@ mod should {
         vec![AppEvent::Character('c')],
         vec![State {
             input_message: "c".into(),
+            cursor: 1,
             ..Default::default()
         }]
         ; "single character")]
@@ -90,14 +108,17 @@ mod should {
         vec![
             State {
                 input_message: "m".into(),
+                cursor: 1,
                 ..Default::default()
             },
             State {
                 input_message: "me".into(),
+                cursor: 2,
                 ..Default::default()
             },
             State {
                 input_message: "".into(),
+                cursor: 0,
                 messages: vec!["me".into()],
                 ..Default::default()
             },
@@ -112,14 +133,17 @@ mod should {
         vec![
             State {
                 input_message: "m".into(),
+                cursor: 1,
                 ..Default::default()
             },
             State {
                 input_message: "me".into(),
+                cursor: 2,
                 ..Default::default()
             },
             State {
                 input_message: "m".into(),
+                cursor: 1,
                 ..Default::default()
             },
         ]
@@ -139,6 +163,61 @@ mod should {
 
         let (sender, receiver) = mpsc::channel(1);
         let mut tested_app = App::new(receiver, renderer_mock);
+
+        task::spawn(async move {
+            for event in events {
+                sender.send(event).await.unwrap();
+            }
+        });
+
+        tokio::time::timeout(Duration::from_millis(100), async move {
+            tested_app.run().await.unwrap();
+        })
+        .await
+        .unwrap();
+    }
+
+    #[test_case(
+        vec![AppEvent::CursorLeft],
+        vec![16]
+        ; "single left")]
+    #[test_case(
+        vec![AppEvent::CursorStart, AppEvent::CursorRight],
+        vec![0, 1]
+        ; "to start and one right")]
+    #[test_case(
+        vec![AppEvent::CursorStart, AppEvent::CursorLeft],
+        vec![0, 0]
+        ; "cursor pos can not be negative")]
+    #[test_case(
+        vec![AppEvent::CursorStart, AppEvent::CursorEnd, AppEvent::CursorRight],
+        vec![0, 17, 17]
+        ; "do not exceed input message")]
+    #[tokio::test]
+    async fn move_cursor(events: Vec<AppEvent>, cursor_positions: Vec<usize>) {
+        let init_state = State {
+            input_message: "Some long message".into(),
+            cursor: 17,
+            ..Default::default()
+        };
+
+        let mut seq = Sequence::new();
+        let mut renderer_mock = setup_rendered_mock();
+        for s in cursor_positions {
+            let mut state = init_state.clone();
+            state.cursor = s;
+
+            renderer_mock
+                .expect_render()
+                .times(1)
+                .with(eq(state.clone()))
+                .in_sequence(&mut seq)
+                .returning(|_| Ok(()));
+        }
+
+        let (sender, receiver) = mpsc::channel(1);
+        let mut tested_app = App::new(receiver, renderer_mock);
+        tested_app.state = init_state;
 
         task::spawn(async move {
             for event in events {
