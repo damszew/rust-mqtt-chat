@@ -34,7 +34,7 @@ where
                     break;
                 }
                 AppEvent::Character(ch) => {
-                    self.state.input_message.push(ch);
+                    self.state.input_message.insert(self.state.cursor, ch);
                     self.state.cursor += 1;
                 }
                 AppEvent::Accept => {
@@ -183,6 +183,23 @@ mod should {
             },
         ]
         ; "remove when inside message")]
+    #[test_case(
+        State {
+            input_message: "some message".into(),
+            cursor: 4,
+            ..Default::default()
+        },
+        vec![
+            AppEvent::Character('!'),
+        ],
+        vec![
+            State {
+                input_message: "some! message".into(),
+                cursor: 5,
+                ..Default::default()
+            },
+        ]
+        ; "insert char inside message")]
     #[tokio::test]
     async fn render_frame_on_update(
         init_state: State,
