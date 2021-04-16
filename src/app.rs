@@ -44,7 +44,9 @@ where
                 }
                 AppEvent::RemoveLast => {
                     self.state.input_message.pop();
-                    self.state.cursor -= 1;
+                    if self.state.cursor > 0 {
+                        self.state.cursor -= 1;
+                    }
                 }
                 AppEvent::CursorStart => {
                     self.state.cursor = 0;
@@ -148,6 +150,18 @@ mod should {
             },
         ]
         ; "remove last character")]
+    #[test_case(
+            vec![
+                AppEvent::RemoveLast,
+            ],
+            vec![
+                State {
+                    input_message: "".into(),
+                    cursor: 0,
+                    ..Default::default()
+                },
+            ]
+            ; "remove on empty buffer")]
     #[tokio::test]
     async fn render_frame_on_update(events: Vec<AppEvent>, expected_states: Vec<State>) {
         let mut seq = Sequence::new();
