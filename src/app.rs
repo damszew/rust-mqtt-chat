@@ -37,6 +37,11 @@ where
                     self.state.input_message.push(ch);
                     self.renderer.render(&self.state)?;
                 }
+                AppEvent::Accept => {
+                    let msg = self.state.input_message.drain(..).collect();
+                    self.state.messages.push(msg);
+                    self.renderer.render(&self.state)?;
+                }
                 _ => todo!(),
             }
         }
@@ -49,7 +54,7 @@ where
 mod should {
     use std::time::Duration;
 
-    use mockall::predicate::*;
+    use mockall::{predicate::*, Sequence};
     use tokio::{sync::mpsc, task};
 
     use super::*;
@@ -84,6 +89,56 @@ mod should {
 
         task::spawn(async move {
             sender.send(event).await.unwrap();
+        });
+
+        tokio::time::timeout(Duration::from_millis(100), async move {
+            tested_app.run().await.unwrap();
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn on_accept_push_input_to_messages() {
+        let events = vec![
+            AppEvent::Character('m'),
+            AppEvent::Character('e'),
+            AppEvent::Accept,
+        ];
+        let expected_states = vec![
+            State {
+                input_message: "m".into(),
+                ..Default::default()
+            },
+            State {
+                input_message: "me".into(),
+                ..Default::default()
+            },
+            State {
+                input_message: "".into(),
+                messages: vec!["me".into()],
+                ..Default::default()
+            },
+        ];
+
+        let mut seq = Sequence::new();
+        let mut renderer_mock = setup_rendered_mock();
+        for s in expected_states {
+            renderer_mock
+                .expect_render()
+                .times(1)
+                .with(eq(s))
+                .in_sequence(&mut seq)
+                .returning(|_| Ok(()));
+        }
+
+        let (sender, receiver) = mpsc::channel(1);
+        let mut tested_app = App::new(receiver, renderer_mock);
+
+        task::spawn(async move {
+            for event in events {
+                sender.send(event).await.unwrap();
+            }
         });
 
         tokio::time::timeout(Duration::from_millis(100), async move {
