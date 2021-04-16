@@ -32,8 +32,8 @@ where
     async fn dispatch_events(&mut self) -> anyhow::Result<()> {
         while let Some(event) = self.event_stream.next().await {
             let event = event?;
-            match event {
-                Event::Key(KeyEvent { code, modifiers }) => match code {
+            if let Event::Key(KeyEvent { code, modifiers }) = event {
+                match code {
                     KeyCode::Esc => {
                         self.sender.send(AppEvent::Quit).await?;
                         break;
@@ -75,9 +75,8 @@ where
                         self.sender.send(AppEvent::ScrollDown).await?;
                     }
                     _ => {}
-                },
-                _ => (), // Ignore other events
-            }
+                }
+            } // Ignore other events
         }
 
         Ok(())
