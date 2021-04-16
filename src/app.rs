@@ -9,6 +9,7 @@ use crate::{
 pub struct App<R> {
     receiver: mpsc::Receiver<AppEvent>,
     renderer: R,
+    state: State,
 }
 
 impl<R> App<R>
@@ -19,7 +20,11 @@ where
         let state = State::default();
         renderer.render(&state).unwrap();
 
-        Self { receiver, renderer }
+        Self {
+            receiver,
+            renderer,
+            state,
+        }
     }
 
     pub async fn run(&mut self) -> Result<()> {
@@ -28,8 +33,9 @@ where
                 AppEvent::Quit => {
                     break;
                 }
-                AppEvent::Character(_) => {
-                    self.renderer.render(&State::default()).unwrap();
+                AppEvent::Character(ch) => {
+                    self.state.input_message.push(ch);
+                    self.renderer.render(&self.state)?;
                 }
                 _ => todo!(),
             }
@@ -52,39 +58,32 @@ mod should {
 
     #[test]
     fn render_frame_on_startup() {
-        let expected_state = State::default();
+        let renderer_mock = setup_rendered_mock();
 
         let (_, receiver) = mpsc::channel(1);
+        let _ = App::new(receiver, renderer_mock);
+    }
 
-        let mut renderer_mock = MockRenderer::new();
+    #[tokio::test]
+    async fn render_frame_on_update() {
+        let event = AppEvent::Character('c');
+        let expected_state = State {
+            input_message: "c".into(),
+            ..Default::default()
+        };
 
+        let mut renderer_mock = setup_rendered_mock();
         renderer_mock
             .expect_render()
             .times(1)
             .with(eq(expected_state))
             .returning(|_| Ok(()));
 
-        let _ = App::new(receiver, renderer_mock);
-    }
-
-    #[tokio::test]
-    async fn render_frame_on_update() {
-        let expected_state = State::default();
-
         let (sender, receiver) = mpsc::channel(1);
-
-        let mut renderer_mock = MockRenderer::new();
-
-        renderer_mock
-            .expect_render()
-            .times(2)
-            .with(eq(expected_state))
-            .returning(|_| Ok(()));
-
         let mut tested_app = App::new(receiver, renderer_mock);
 
         task::spawn(async move {
-            sender.send(AppEvent::Character('c')).await.unwrap();
+            sender.send(event).await.unwrap();
         });
 
         tokio::time::timeout(Duration::from_millis(100), async move {
@@ -96,20 +95,16 @@ mod should {
 
     #[tokio::test]
     async fn exit_loop_on_quit() {
+        let event = AppEvent::Quit;
+
+        let renderer_mock = setup_rendered_mock();
+
         let (sender, receiver) = mpsc::channel(1);
-
-        let mut renderer_mock = MockRenderer::new();
-        renderer_mock
-            .expect_render()
-            .times(1) // only start-up render
-            .with(eq(State::default()))
-            .returning(|_| Ok(()));
-
         let mut tested_app = App::new(receiver, renderer_mock);
 
         let test_sender = sender.clone();
         task::spawn(async move {
-            test_sender.send(AppEvent::Quit).await.unwrap();
+            test_sender.send(event).await.unwrap();
         });
 
         tokio::time::timeout(Duration::from_millis(100), async move {
@@ -117,5 +112,18 @@ mod should {
         })
         .await
         .unwrap();
+    }
+
+    fn setup_rendered_mock() -> MockRenderer {
+        let mut renderer_mock = MockRenderer::new();
+
+        // start-up call
+        renderer_mock
+            .expect_render()
+            .times(1)
+            .with(eq(State::default()))
+            .returning(|_| Ok(()));
+
+        renderer_mock
     }
 }
