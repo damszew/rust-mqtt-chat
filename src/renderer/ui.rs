@@ -64,7 +64,6 @@ fn draw_messages_panel(state: &State, frame: &mut Frame<impl Backend>, chunk: Re
     let messages = state
         .messages
         .iter()
-        .rev()
         .map(|message| {
             let content = Spans::from(Span::raw(message));
             content
