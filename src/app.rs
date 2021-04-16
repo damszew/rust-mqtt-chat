@@ -42,6 +42,11 @@ where
                     self.state.cursor = 0;
                     self.state.messages.push(msg);
                 }
+                AppEvent::Remove => {
+                    if self.state.cursor < self.state.input_message.len() {
+                        self.state.input_message.remove(self.state.cursor);
+                    }
+                }
                 AppEvent::RemoveLast => {
                     if self.state.cursor > 0 {
                         self.state.cursor -= 1;
@@ -183,6 +188,40 @@ mod should {
             },
         ]
         ; "remove when inside message")]
+    #[test_case(
+        State {
+            input_message: "some->message".into(),
+            cursor: 5,
+            ..Default::default()
+        },
+        vec![
+            AppEvent::Remove,
+        ],
+        vec![
+            State {
+                input_message: "some-message".into(),
+                cursor: 5,
+                ..Default::default()
+            },
+        ]
+        ; "delete when inside message")]
+    #[test_case(
+        State {
+            input_message: "some".into(),
+            cursor: 4,
+            ..Default::default()
+        },
+        vec![
+            AppEvent::Remove,
+        ],
+        vec![
+            State {
+                input_message: "some".into(),
+                cursor: 4,
+                ..Default::default()
+            },
+        ]
+        ; "delete at the end")]
     #[test_case(
         State {
             input_message: "some message".into(),
