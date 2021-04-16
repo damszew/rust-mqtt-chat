@@ -43,9 +43,9 @@ where
                     self.state.messages.push(msg);
                 }
                 AppEvent::RemoveLast => {
-                    self.state.input_message.pop();
                     if self.state.cursor > 0 {
                         self.state.cursor -= 1;
+                        self.state.input_message.remove(self.state.cursor);
                     }
                 }
                 AppEvent::CursorStart => {
@@ -94,6 +94,7 @@ mod should {
     }
 
     #[test_case(
+        State::default(),
         vec![AppEvent::Character('c')],
         vec![State {
             input_message: "c".into(),
@@ -102,6 +103,7 @@ mod should {
         }]
         ; "single character")]
     #[test_case(
+        State::default(),
         vec![
             AppEvent::Character('m'),
             AppEvent::Character('e'),
@@ -127,6 +129,7 @@ mod should {
         ]
         ; "on accept push input to messages")]
     #[test_case(
+        State::default(),
         vec![
             AppEvent::Character('m'),
             AppEvent::Character('e'),
@@ -151,19 +154,41 @@ mod should {
         ]
         ; "remove last character")]
     #[test_case(
-            vec![
-                AppEvent::RemoveLast,
-            ],
-            vec![
-                State {
-                    input_message: "".into(),
-                    cursor: 0,
-                    ..Default::default()
-                },
-            ]
-            ; "remove on empty buffer")]
+        State::default(),
+        vec![
+            AppEvent::RemoveLast,
+        ],
+        vec![
+            State {
+                input_message: "".into(),
+                cursor: 0,
+                ..Default::default()
+            },
+        ]
+        ; "remove on empty buffer")]
+    #[test_case(
+        State {
+            input_message: "some->message".into(),
+            cursor: 6,
+            ..Default::default()
+        },
+        vec![
+            AppEvent::RemoveLast,
+        ],
+        vec![
+            State {
+                input_message: "some-message".into(),
+                cursor: 5,
+                ..Default::default()
+            },
+        ]
+        ; "remove when inside message")]
     #[tokio::test]
-    async fn render_frame_on_update(events: Vec<AppEvent>, expected_states: Vec<State>) {
+    async fn render_frame_on_update(
+        init_state: State,
+        events: Vec<AppEvent>,
+        expected_states: Vec<State>,
+    ) {
         let mut seq = Sequence::new();
         let mut renderer_mock = setup_rendered_mock();
         for s in expected_states {
@@ -177,6 +202,7 @@ mod should {
 
         let (sender, receiver) = mpsc::channel(1);
         let mut tested_app = App::new(receiver, renderer_mock);
+        tested_app.state = init_state;
 
         task::spawn(async move {
             for event in events {
