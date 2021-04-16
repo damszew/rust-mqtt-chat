@@ -76,8 +76,7 @@ where
                     }
                     _ => {}
                 },
-                Event::Mouse(_) => (),
-                Event::Resize(_, _) => (),
+                _ => (), // Ignore other events
             }
         }
 
@@ -87,7 +86,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crossterm::event::KeyModifiers;
+    use crossterm::event::{KeyModifiers, MouseEvent, MouseEventKind};
     use test_case::test_case;
 
     use super::*;
@@ -183,5 +182,34 @@ mod tests {
         .unwrap();
 
         event
+    }
+
+    #[test_case( Event::Mouse(
+                    MouseEvent {
+                        kind: MouseEventKind::Moved,
+                        column: 0,
+                        row: 0,
+                        modifiers: KeyModifiers::NONE,
+                    })
+        ; "mouse")]
+    #[test_case( Event::Resize(0, 0) ; "resize")]
+    #[tokio::test]
+    async fn ignore(event: Event) {
+        let stream = tokio_stream::iter(vec![Ok(event)]);
+
+        let (sender, mut receiver) = mpsc::channel(1);
+        let mut tested_event_handler = CrosstermEventsHandler {
+            event_stream: stream,
+            sender,
+        };
+
+        tested_event_handler.dispatch_events().await.unwrap();
+
+        let result = tokio::time::timeout(std::time::Duration::from_millis(100), async move {
+            receiver.recv().await.unwrap()
+        })
+        .await;
+
+        assert!(result.is_err()) // We ignore events so timeouts are triggered
     }
 }
