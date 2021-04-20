@@ -1,5 +1,6 @@
 pub mod app;
 pub mod events_handler;
+pub mod queue;
 pub mod renderer;
 
 #[derive(Debug, PartialEq)]

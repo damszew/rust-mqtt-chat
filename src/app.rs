@@ -71,12 +71,7 @@ where
                         self.state.cursor -= 1;
                     }
                 }
-                AppEvent::ScrollUp => {
-                    todo!()
-                }
-                AppEvent::ScrollDown => {
-                    todo!()
-                }
+                _ => {}
             }
             self.renderer.render(&self.state)?;
         }

@@ -2,6 +2,7 @@ mod ui;
 
 use anyhow::Result;
 use chrono::{DateTime, Local};
+use serde::{Deserialize, Serialize};
 
 pub mod terminal_renderer;
 
@@ -12,7 +13,7 @@ pub struct State {
     pub messages: Vec<Message>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message {
     pub time: DateTime<Local>,
     pub msg: String,
