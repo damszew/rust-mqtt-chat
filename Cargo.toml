@@ -13,7 +13,9 @@ anyhow = "1"
 crossterm = { version = "0.19", default-features = false, features = ["event-stream"] }
 async-trait = "0.1.48"
 futures = "0.3.14"
-chrono = "0.4.19"
+chrono = { version = "0.4.19", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 [dev-dependencies]
 mockall = "0.9.1"
