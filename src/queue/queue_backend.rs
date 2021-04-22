@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+#[derive(Debug, PartialEq)]
 pub struct BackendMessage {
     pub topic: String,
     pub payload: Vec<u8>,
@@ -11,4 +12,5 @@ pub trait QueueBackend {
     async fn connect(&mut self) -> Result<()>;
     async fn subscribe(&mut self, topic: &str) -> Result<()>;
     async fn recv(&mut self) -> Option<BackendMessage>;
+    async fn send(&mut self, msg: BackendMessage) -> Result<()>;
 }
