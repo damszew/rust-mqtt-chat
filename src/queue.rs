@@ -44,23 +44,29 @@ where
     }
 
     pub async fn run(&mut self) -> Result<()> {
-        while let Some(message) = self.queue_backend.recv().await {
-            let futures = self
-                .subscribers
-                .iter()
-                .map(|subscriber| subscriber.send(QueueEvent::Message(Message::new("".into()))))
-                .collect::<Vec<_>>();
+        loop {
+            tokio::select! {
+                Some(message) = self.queue_backend.recv() => {
+                    let futures = self
+                        .subscribers
+                        .iter()
+                        .map(|subscriber| subscriber.send(QueueEvent::Message(Message::new("".into()))))
+                        .collect::<Vec<_>>();
 
-            futures::future::join_all(futures).await;
+                    futures::future::join_all(futures).await;
+                }
+                Some(message) = self.publisher_recv.recv() => {
+                    self.queue_backend
+                        .send(BackendMessage {
+                            topic: "topic".into(),
+                            payload: Vec::new(),
+                        })
+                        .await?;
+                },
+                else => { break }
+            }
         }
-        while let Some(message) = self.publisher_recv.recv().await {
-            self.queue_backend
-                .send(BackendMessage {
-                    topic: "topic".into(),
-                    payload: Vec::new(),
-                })
-                .await?;
-        }
+
         Ok(())
     }
 }
@@ -78,19 +84,7 @@ mod tests {
     async fn establish_connection_with_queue() {
         let expected_subscribe_topic = "topic";
 
-        let mut seq = Sequence::new();
-        let mut queue_backend_mock = MockQueueBackend::new();
-        queue_backend_mock
-            .expect_connect()
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(|| Ok(()));
-        queue_backend_mock
-            .expect_subscribe()
-            .times(1)
-            .with(eq(expected_subscribe_topic))
-            .in_sequence(&mut seq)
-            .returning(|_| Ok(()));
+        let queue_backend_mock = setup_queue_backend_mock(expected_subscribe_topic);
 
         let tested_queue = Queue::new(queue_backend_mock).await;
         assert!(tested_queue.is_ok());
@@ -98,33 +92,20 @@ mod tests {
 
     #[tokio::test]
     async fn forward_queue_messages_to_subscribers() {
-        let expected_event = QueueEvent::Message(Message::new("".into()));
+        let expected_topic = "topic";
+        let expected_payload = "";
 
-        let expected_subscribe_topic = "topic";
+        let expected_event = QueueEvent::Message(Message::new(expected_payload.into()));
         let mut returned_messages = vec![BackendMessage {
-            topic: expected_subscribe_topic.to_string(),
-            payload: vec![],
+            topic: expected_topic.to_string(),
+            payload: expected_payload.as_bytes().to_owned(),
         }]
         .into_iter();
 
-        let mut seq = Sequence::new();
-        let mut queue_backend_mock = MockQueueBackend::new();
-        queue_backend_mock
-            .expect_connect()
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(|| Ok(()));
-        queue_backend_mock
-            .expect_subscribe()
-            .times(1)
-            .with(eq(expected_subscribe_topic))
-            .in_sequence(&mut seq)
-            .returning(|_| Ok(()));
-
+        let mut queue_backend_mock = setup_queue_backend_mock(expected_topic);
         queue_backend_mock
             .expect_recv()
             .times(2)
-            .in_sequence(&mut seq)
             .returning(move || returned_messages.next());
 
         let (mut tested_queue, _) = Queue::new(queue_backend_mock).await.unwrap();
@@ -134,7 +115,7 @@ mod tests {
         tested_queue.subscribe(sender1).await.unwrap();
         tested_queue.subscribe(sender2).await.unwrap();
 
-        let tested = tested_queue.run();
+        let tested = async move { tested_queue.run().await };
 
         let r = tokio::try_join!(
             tokio::time::timeout(std::time::Duration::from_millis(100), tested),
@@ -157,9 +138,33 @@ mod tests {
         let event_to_publish = QueueEvent::Message(Message::new("".into()));
 
         let expected_subscribe_topic = "topic";
-        let mut messages_from_queue = vec![].into_iter();
 
+        let mut queue_backend_mock = setup_queue_backend_mock(expected_subscribe_topic);
+        queue_backend_mock.expect_recv().returning(|| None);
+        queue_backend_mock
+            .expect_send()
+            .times(1)
+            .with(eq(expected_message))
+            .returning(move |_| Ok(()));
+
+        let (mut tested_queue, publisher) = Queue::new(queue_backend_mock).await.unwrap();
+
+        let send = async move { publisher.send(event_to_publish).await };
+        let tested = async move { tested_queue.run().await };
+
+        let r = tokio::try_join!(
+            tokio::time::timeout(std::time::Duration::from_millis(100), tested),
+            tokio::time::timeout(std::time::Duration::from_millis(100), send)
+        )
+        .unwrap();
+
+        assert!(r.0.is_ok());
+        assert!(r.1.is_ok());
+    }
+
+    fn setup_queue_backend_mock(expected_subscribe_topic: &'static str) -> MockQueueBackend {
         let mut seq = Sequence::new();
+
         let mut queue_backend_mock = MockQueueBackend::new();
         queue_backend_mock
             .expect_connect()
@@ -174,30 +179,5 @@ mod tests {
             .returning(|_| Ok(()));
 
         queue_backend_mock
-            .expect_recv()
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(move || messages_from_queue.next());
-
-        queue_backend_mock
-            .expect_send()
-            .times(1)
-            .with(eq(expected_message))
-            .returning(move |_| Ok(()));
-
-        let (mut tested_queue, publisher) = Queue::new(queue_backend_mock).await.unwrap();
-
-        let send = async move { publisher.send(event_to_publish).await };
-
-        let tested = tested_queue.run();
-
-        let r = tokio::try_join!(
-            tokio::time::timeout(std::time::Duration::from_millis(100), tested),
-            tokio::time::timeout(std::time::Duration::from_millis(100), send)
-        )
-        .unwrap();
-
-        assert!(r.0.is_ok());
-        assert!(r.1.is_ok());
     }
 }

@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct BackendMessage {
     pub topic: String,
     pub payload: Vec<u8>,
