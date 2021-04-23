@@ -1,3 +1,5 @@
+pub mod mqtt_backend;
+
 use anyhow::Result;
 
 #[cfg_attr(test, mockall::automock)]
