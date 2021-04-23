@@ -1,48 +1,24 @@
-pub mod queue_backend;
+pub mod network_backend;
 
 use anyhow::Result;
 use tokio::sync::mpsc;
 
 use crate::renderer::Message;
 
-use self::queue_backend::{BackendMessage, QueueBackend};
+use self::network_backend::NetworkBackend;
 
 #[derive(Debug, PartialEq)]
 pub enum QueueEvent {
     Message(Message),
 }
 
-pub async fn queue<Q>(
-    mut queue_backend: Q,
-    subscribers: Vec<mpsc::Sender<QueueEvent>>,
-    publishers: mpsc::Receiver<QueueEvent>,
-) -> Result<(Consumer<Q>, Publisher<Q>)>
-where
-    Q: QueueBackend + Clone,
-{
-    queue_backend.connect().await?;
-    queue_backend.subscribe("topic").await?;
-
-    let consumer = Consumer {
-        queue_backend: queue_backend.clone(),
-        subscribers,
-    };
-
-    let publisher = Publisher {
-        queue_backend,
-        publishers,
-    };
-
-    Ok((consumer, publisher))
-}
-
 pub struct Consumer<Q> {
-    queue_backend: Q,
+    network_backend: Q,
     subscribers: Vec<mpsc::Sender<QueueEvent>>,
 }
 impl<Q> Consumer<Q>
 where
-    Q: QueueBackend,
+    Q: NetworkBackend,
 {
     pub async fn subscribe(&mut self, subscriber: mpsc::Sender<QueueEvent>) -> Result<()> {
         self.subscribers.push(subscriber);
@@ -50,7 +26,7 @@ where
     }
 
     pub async fn run(&mut self) -> Result<()> {
-        while let Some(message) = self.queue_backend.recv().await {
+        while let Some(message) = self.network_backend.recv().await {
             let futures = self
                 .subscribers
                 .iter()
@@ -65,22 +41,17 @@ where
 }
 
 pub struct Publisher<Q> {
-    queue_backend: Q,
+    network_backend: Q,
     publishers: mpsc::Receiver<QueueEvent>,
 }
 
 impl<Q> Publisher<Q>
 where
-    Q: QueueBackend,
+    Q: NetworkBackend,
 {
     pub async fn run(&mut self) -> Result<()> {
         while let Some(message) = self.publishers.recv().await {
-            self.queue_backend
-                .send(BackendMessage {
-                    topic: "topic".into(),
-                    payload: Vec::new(),
-                })
-                .await?;
+            self.network_backend.send(Vec::new()).await?;
         }
 
         Ok(())
@@ -89,37 +60,19 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        queue_backend::{BackendMessage, MockQueueBackend},
-        *,
-    };
+    use super::{network_backend::MockNetworkBackend, *};
 
-    use mockall::{predicate::*, Sequence};
-
-    // #[tokio::test]
-    // async fn establish_connection_with_queue() {
-    //     let expected_subscribe_topic = "topic";
-
-    //     let queue_backend_mock = setup_queue_backend_mock(expected_subscribe_topic);
-
-    //     let tested_queue = Queue::new(queue_backend_mock).await;
-    //     assert!(tested_queue.is_ok());
-    // }
+    use mockall::predicate::*;
 
     #[tokio::test]
     async fn forward_queue_messages_to_subscribers() {
-        let expected_topic = "topic";
         let expected_payload = "";
 
         let expected_event = QueueEvent::Message(Message::new(expected_payload.into()));
-        let mut returned_messages = vec![BackendMessage {
-            topic: expected_topic.to_string(),
-            payload: expected_payload.as_bytes().to_owned(),
-        }]
-        .into_iter();
+        let mut returned_messages = vec![expected_payload.as_bytes().to_owned()].into_iter();
 
-        let mut queue_backend_mock = MockQueueBackend::new();
-        queue_backend_mock
+        let mut network_backend_mock = MockNetworkBackend::new();
+        network_backend_mock
             .expect_recv()
             .times(2)
             .returning(move || returned_messages.next());
@@ -128,7 +81,7 @@ mod tests {
         let (sender2, mut receiver2) = mpsc::channel(1);
 
         let mut tested_consumer = Consumer {
-            queue_backend: queue_backend_mock,
+            network_backend: network_backend_mock,
             subscribers: vec![sender1, sender2],
         };
 
@@ -148,25 +101,19 @@ mod tests {
 
     #[tokio::test]
     async fn forward_messages_from_publishers_to_queue() {
-        let expected_message = BackendMessage {
-            topic: "topic".into(),
-            payload: Vec::new(),
-        };
         let event_to_publish = QueueEvent::Message(Message::new("".into()));
 
-        let expected_subscribe_topic = "topic";
-
-        let mut queue_backend_mock = MockQueueBackend::new();
-        queue_backend_mock.expect_recv().returning(|| None);
-        queue_backend_mock
+        let mut network_backend_mock = MockNetworkBackend::new();
+        network_backend_mock.expect_recv().returning(|| None);
+        network_backend_mock
             .expect_send()
             .times(1)
-            .with(eq(expected_message))
+            .with(eq(Vec::new()))
             .returning(move |_| Ok(()));
 
         let (sender, receiver) = mpsc::channel(1);
         let mut tested_publisher = Publisher {
-            queue_backend: queue_backend_mock,
+            network_backend: network_backend_mock,
             publishers: receiver,
         };
 
@@ -181,24 +128,5 @@ mod tests {
 
         assert!(r.0.is_ok());
         assert!(r.1.is_ok());
-    }
-
-    fn setup_queue_backend_mock(expected_subscribe_topic: &'static str) -> MockQueueBackend {
-        let mut seq = Sequence::new();
-
-        let mut queue_backend_mock = MockQueueBackend::new();
-        queue_backend_mock
-            .expect_connect()
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(|| Ok(()));
-        queue_backend_mock
-            .expect_subscribe()
-            .times(1)
-            .with(eq(expected_subscribe_topic))
-            .in_sequence(&mut seq)
-            .returning(|_| Ok(()));
-
-        queue_backend_mock
     }
 }
