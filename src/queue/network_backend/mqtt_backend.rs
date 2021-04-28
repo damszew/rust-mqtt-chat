@@ -56,7 +56,7 @@ impl NetworkBackend for MqttQueue {
 
     async fn send(&mut self, msg: Vec<u8>) -> Result<()> {
         let mqtt_message = Message::new(&self.topic, msg, 0);
-        let result = self.client.publish(mqtt_message).await?;
-        Ok(result)
+        self.client.publish(mqtt_message).await?;
+        Ok(())
     }
 }
