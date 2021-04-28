@@ -14,7 +14,11 @@ where
 {
     pub async fn run(&mut self) -> Result<()> {
         while let Some(message) = self.publishers.recv().await {
-            self.network_backend.send(Vec::new()).await?;
+            match message {
+                QueueEvent::Message(msg) => {
+                    self.network_backend.send(msg.msg.into_bytes()).await?;
+                }
+            }
         }
 
         Ok(())
@@ -27,26 +31,72 @@ mod tests {
     use crate::renderer::Message;
 
     use mockall::predicate::*;
+    use test_case::test_case;
 
+    #[test_case(
+        vec![
+            QueueEvent::Message(Message::new("".into())),
+        ],
+        vec![
+            "".as_bytes().to_owned(),
+        ]
+        ; "Handle empty payload")]
+    #[test_case(
+        vec![
+            QueueEvent::Message(Message::new("payload 1".into())),
+            QueueEvent::Message(Message::new("payload 2".into())),
+        ],
+        vec![
+            "payload 1".as_bytes().to_owned(),
+            "payload 2".as_bytes().to_owned(),
+        ]
+        ; "Publish messages in proper order")]
+    #[test_case(
+        vec![
+            QueueEvent::Message(Message::new("the same payload".into())),
+            QueueEvent::Message(Message::new("the same payload".into())),
+        ],
+        vec![
+            "the same payload".as_bytes().to_owned(),
+            "the same payload".as_bytes().to_owned(),
+        ]
+        ; "Publish even repeated messages")]
+    #[test_case(
+        vec![
+            QueueEvent::Message(Message::new("녹".into())),
+            QueueEvent::Message(Message::new("😎".into())),
+        ],
+        vec![
+            "녹".as_bytes().to_owned(),
+            "😎".as_bytes().to_owned(),
+        ]
+        ; "Handle non ascii messages")]
     #[tokio::test]
-    async fn forward_messages_from_publishers_to_queue() {
-        let event_to_publish = QueueEvent::Message(Message::new("".into()));
-
+    async fn publish_couple_messages(
+        published_messages: Vec<QueueEvent>,
+        expected_messages: Vec<Vec<u8>>,
+    ) {
         let mut network_backend_mock = MockNetworkBackend::new();
-        network_backend_mock.expect_recv().returning(|| None);
-        network_backend_mock
-            .expect_send()
-            .times(1)
-            .with(eq(Vec::new()))
-            .returning(move |_| Ok(()));
+        for expected_message in expected_messages {
+            network_backend_mock
+                .expect_send()
+                .times(1)
+                .with(eq(expected_message))
+                .returning(move |_| Ok(()));
+        }
 
-        let (sender, receiver) = mpsc::channel(1);
+        let (test_sender, receiver) = mpsc::channel(1);
         let mut tested_publisher = Publisher {
             network_backend: network_backend_mock,
             publishers: receiver,
         };
 
-        let send = async move { sender.send(event_to_publish).await };
+        let send = async move {
+            for event in published_messages {
+                test_sender.send(event).await?;
+            }
+            Ok::<_, anyhow::Error>(())
+        };
         let tested = async move { tested_publisher.run().await };
 
         let r = tokio::try_join!(
