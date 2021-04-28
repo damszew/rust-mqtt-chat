@@ -1,11 +1,11 @@
 use anyhow::Result;
 use tokio::sync::mpsc;
 
-use super::{network_backend::NetworkBackend, QueueEvent};
+use super::{network_backend::NetworkBackend, NetworkEvent};
 
 pub struct Publisher<Q> {
     network_backend: Q,
-    publishers: mpsc::Receiver<QueueEvent>,
+    publishers: mpsc::Receiver<NetworkEvent>,
 }
 
 impl<Q> Publisher<Q>
@@ -15,8 +15,8 @@ where
     pub async fn run(&mut self) -> Result<()> {
         while let Some(message) = self.publishers.recv().await {
             match message {
-                QueueEvent::Message(msg) => {
-                    self.network_backend.send(msg.msg.into_bytes()).await?;
+                NetworkEvent::Message(msg) => {
+                    self.network_backend.send(msg).await?;
                 }
             }
         }
@@ -28,14 +28,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::{super::network_backend::MockNetworkBackend, *};
-    use crate::renderer::Message;
 
     use mockall::predicate::*;
     use test_case::test_case;
 
     #[test_case(
         vec![
-            QueueEvent::Message(Message::new("".into())),
+            NetworkEvent::Message("".into()),
         ],
         vec![
             "".as_bytes().to_owned(),
@@ -43,8 +42,8 @@ mod tests {
         ; "Handle empty payload")]
     #[test_case(
         vec![
-            QueueEvent::Message(Message::new("payload 1".into())),
-            QueueEvent::Message(Message::new("payload 2".into())),
+            NetworkEvent::Message("payload 1".into()),
+            NetworkEvent::Message("payload 2".into()),
         ],
         vec![
             "payload 1".as_bytes().to_owned(),
@@ -53,8 +52,8 @@ mod tests {
         ; "Publish messages in proper order")]
     #[test_case(
         vec![
-            QueueEvent::Message(Message::new("the same payload".into())),
-            QueueEvent::Message(Message::new("the same payload".into())),
+            NetworkEvent::Message("the same payload".into()),
+            NetworkEvent::Message("the same payload".into()),
         ],
         vec![
             "the same payload".as_bytes().to_owned(),
@@ -63,8 +62,8 @@ mod tests {
         ; "Publish even repeated messages")]
     #[test_case(
         vec![
-            QueueEvent::Message(Message::new("녹".into())),
-            QueueEvent::Message(Message::new("😎".into())),
+            NetworkEvent::Message("녹".into()),
+            NetworkEvent::Message("😎".into()),
         ],
         vec![
             "녹".as_bytes().to_owned(),
@@ -73,7 +72,7 @@ mod tests {
         ; "Handle non ascii messages")]
     #[tokio::test]
     async fn publish_couple_messages(
-        published_messages: Vec<QueueEvent>,
+        published_messages: Vec<NetworkEvent>,
         expected_messages: Vec<Vec<u8>>,
     ) {
         let mut network_backend_mock = MockNetworkBackend::new();
