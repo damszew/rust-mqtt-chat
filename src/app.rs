@@ -44,7 +44,7 @@ where
                 Some(event) = self.receiver.recv() => {
                     match event {
                         AppEvent::Quit => {
-                            break;
+                            return Ok(());
                         }
                         AppEvent::Character(ch) => {
                             self.state.input_message.insert(self.state.cursor, ch);
