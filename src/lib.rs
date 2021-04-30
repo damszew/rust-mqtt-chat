@@ -5,6 +5,7 @@ pub mod renderer;
 
 #[derive(Debug, PartialEq)]
 pub enum AppEvent {
+    // TODO: Rename to TerminalEvents and move to event_handler
     Quit,
     Character(char),
     Accept,

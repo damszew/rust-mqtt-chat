@@ -2,6 +2,7 @@ use anyhow::Result;
 use paho_mqtt::{AsyncClient, ConnectOptionsBuilder, CreateOptionsBuilder};
 use tokio::sync::mpsc;
 
+// TODO: add Mqtt prefix to module names
 mod consumer;
 mod publisher;
 
@@ -17,6 +18,7 @@ pub async fn network(
     topic_prefix: impl Into<String>,
     chat_room: impl Into<String>,
 ) -> Result<(mpsc::Sender<NetworkEvent>, mpsc::Receiver<NetworkEvent>)> {
+    // TODO: clean up
     let topic_prefix = topic_prefix.into();
     let chat_room = chat_room.into();
 

@@ -1,4 +1,4 @@
-mod ui;
+mod ui; // TODO: reorganize Renderer/Ui modules
 
 use anyhow::Result;
 use chrono::{DateTime, Local};
