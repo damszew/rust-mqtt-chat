@@ -1,6 +1,7 @@
 use actor_model_chat::{
     app::App,
     events_handler::{crossterm_events_handler::CrosstermEventsHandler, EventHandler},
+    network::network,
     renderer::terminal_renderer::TerminalRenderer,
 };
 use anyhow::Result;
@@ -9,6 +10,8 @@ use tokio::{sync::mpsc, task};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let (publisher, consumer) = network("http://localhost:1883/", "topic", "chat").await?;
+
     let renderer = TerminalRenderer::new(std::io::stdout())?;
 
     let (sender, receiver) = mpsc::channel(1);

@@ -1,23 +1,25 @@
 use anyhow::Result;
+use futures::StreamExt;
+use paho_mqtt::Message;
 use tokio::sync::mpsc;
 
-use super::{network_backend::NetworkBackend, NetworkEvent};
+use super::NetworkEvent;
 
-pub struct Consumer<Q> {
-    network_backend: Q,
-    subscribers: Vec<mpsc::Sender<NetworkEvent>>,
+pub struct MqttConsumer {
+    pub mqtt_receiver: futures::channel::mpsc::Receiver<Option<Message>>,
+    pub subscribers: Vec<mpsc::Sender<NetworkEvent>>,
 }
-impl<Q> Consumer<Q>
-where
-    Q: NetworkBackend,
-{
+
+impl MqttConsumer {
     pub async fn subscribe(&mut self, subscriber: mpsc::Sender<NetworkEvent>) -> Result<()> {
         self.subscribers.push(subscriber);
         Ok(())
     }
 
     pub async fn run(&mut self) -> Result<()> {
-        while let Some(message) = self.network_backend.recv().await {
+        while let Some(Some(message)) = self.mqtt_receiver.next().await {
+            let message = message.payload().to_owned();
+
             let futures = self
                 .subscribers
                 .iter()
@@ -33,7 +35,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{super::network_backend::MockNetworkBackend, *};
+    use super::*;
 
     use test_case::test_case;
 
@@ -69,8 +71,8 @@ mod tests {
 
         let (test_subscriber, mut test_receiver) = mpsc::channel(1);
 
-        let mut tested_consumer = Consumer {
-            network_backend: network_backend_mock,
+        let mut tested_consumer = MqttConsumer {
+            mqtt_receiver: network_backend_mock,
             subscribers: vec![test_subscriber],
         };
 
@@ -108,8 +110,8 @@ mod tests {
         let (test_subscriber1, mut test_receiver1) = mpsc::channel(1);
         let (test_subscriber2, mut test_receiver2) = mpsc::channel(1);
 
-        let mut tested_consumer = Consumer {
-            network_backend: network_backend_mock,
+        let mut tested_consumer = MqttConsumer {
+            mqtt_receiver: network_backend_mock,
             subscribers: vec![test_subscriber1, test_subscriber2],
         };
 
@@ -130,12 +132,16 @@ mod tests {
         assert_eq!(test_result.2.unwrap(), expected_event);
     }
 
-    fn setup_network_mock(mut network_messages: std::vec::IntoIter<Vec<u8>>) -> MockNetworkBackend {
-        let mut network_backend_mock = MockNetworkBackend::new();
-        network_backend_mock
-            .expect_recv()
-            .times(network_messages.len() + 1)
-            .returning(move || network_messages.next());
-        network_backend_mock
+    fn setup_network_mock(
+        network_messages: std::vec::IntoIter<Vec<u8>>,
+    ) -> futures::channel::mpsc::Receiver<Option<Message>> {
+        let (mut sender, receiver) = futures::channel::mpsc::channel(network_messages.len() + 1);
+        for m in network_messages {
+            let mqtt_message = Message::new("topic", m, 0);
+            sender.try_send(Some(mqtt_message)).unwrap();
+        }
+        sender.try_send(None).unwrap();
+
+        receiver
     }
 }
