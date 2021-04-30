@@ -1,7 +1,7 @@
 use actor_model_chat::{
     app::App,
     events_handler::{crossterm_events_handler::CrosstermEventsHandler, EventHandler},
-    network::{network, NetworkEvent},
+    network::network,
     renderer::terminal_renderer::TerminalRenderer,
 };
 use anyhow::Result;
@@ -16,7 +16,7 @@ async fn main() -> Result<()> {
 
     let (sender, receiver) = mpsc::channel(1);
     let mut events_handler = CrosstermEventsHandler::new(sender);
-    let mut app = App::new(receiver, renderer);
+    let mut app = App::new(receiver, renderer, publisher, consumer);
 
     let event_task = task::spawn(async move { events_handler.dispatch_events().await }); // TODO: spawn it inside of some helper fn of events handler
     let app_task = task::spawn(async move { app.run().await });

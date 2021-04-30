@@ -1,13 +1,17 @@
 use anyhow::Result;
+use tokio::select;
 use tokio::sync::mpsc;
 
 use crate::{
+    network::NetworkEvent,
     renderer::{Message, Renderer, State},
     AppEvent,
 };
 
 pub struct App<R> {
     receiver: mpsc::Receiver<AppEvent>,
+    network_publisher: mpsc::Sender<NetworkEvent>,
+    network_consumer: mpsc::Receiver<NetworkEvent>,
     renderer: R,
     state: State,
 }
@@ -16,62 +20,96 @@ impl<R> App<R>
 where
     R: Renderer,
 {
-    pub fn new(receiver: mpsc::Receiver<AppEvent>, mut renderer: R) -> Self {
+    pub fn new(
+        receiver: mpsc::Receiver<AppEvent>,
+        mut renderer: R,
+        network_publisher: mpsc::Sender<NetworkEvent>,
+        network_consumer: mpsc::Receiver<NetworkEvent>,
+    ) -> Self {
         let state = State::default();
         renderer.render(&state).unwrap();
 
         Self {
             receiver,
+            network_publisher,
+            network_consumer,
             renderer,
             state,
         }
     }
 
     pub async fn run(&mut self) -> Result<()> {
-        while let Some(event) = self.receiver.recv().await {
-            match event {
-                AppEvent::Quit => {
-                    break;
-                }
-                AppEvent::Character(ch) => {
-                    self.state.input_message.insert(self.state.cursor, ch);
-                    self.state.cursor += 1;
-                }
-                AppEvent::Accept => {
-                    let msg = self.state.input_message.drain(..).collect();
-                    let message = Message::new(msg);
+        loop {
+            select! {
+                Some(event) = self.receiver.recv() => {
+                    match event {
+                        AppEvent::Quit => {
+                            break;
+                        }
+                        AppEvent::Character(ch) => {
+                            self.state.input_message.insert(self.state.cursor, ch);
+                            self.state.cursor += 1;
+                        }
+                        AppEvent::Accept => {
+                            let msg = self.state.input_message.drain(..).collect::<String>();
+                            let message = Message::new(msg.clone());
 
-                    self.state.cursor = 0;
-                    self.state.messages.push(message);
-                }
-                AppEvent::Remove => {
-                    if self.state.cursor < self.state.input_message.len() {
-                        self.state.input_message.remove(self.state.cursor);
+                            self.state.cursor = 0;
+                            self.state.messages.push(message);
+                            self.network_publisher
+                                .send(NetworkEvent::Message(msg.as_bytes().to_owned()))
+                                .await?;
+                        }
+                        AppEvent::Remove => {
+                            if self.state.cursor < self.state.input_message.len() {
+                                self.state.input_message.remove(self.state.cursor);
+                            }
+                        }
+                        AppEvent::RemoveLast => {
+                            if self.state.cursor > 0 {
+                                self.state.cursor -= 1;
+                                self.state.input_message.remove(self.state.cursor);
+                            }
+                        }
+                        AppEvent::CursorStart => {
+                            self.state.cursor = 0;
+                        }
+                        AppEvent::CursorEnd => {
+                            self.state.cursor = self.state.input_message.len();
+                        }
+                        AppEvent::CursorRight => {
+                            if self.state.cursor < self.state.input_message.len() {
+                                self.state.cursor += 1;
+                            }
+                        }
+                        AppEvent::CursorLeft => {
+                            if self.state.cursor > 0 {
+                                self.state.cursor -= 1;
+                            }
+                        }
+                        _ => {}
                     }
-                }
-                AppEvent::RemoveLast => {
-                    if self.state.cursor > 0 {
-                        self.state.cursor -= 1;
-                        self.state.input_message.remove(self.state.cursor);
+                    self.renderer.render(&self.state)?;
+                },
+                Some(msg) = self.network_consumer.recv() => {
+                    match msg {
+                        NetworkEvent::Message(payload) => self
+                            .state
+                            .messages
+                            .push(Message::new(String::from_utf8(payload)?)),
                     }
+                    self.renderer.render(&self.state)?;
                 }
-                AppEvent::CursorStart => {
-                    self.state.cursor = 0;
-                }
-                AppEvent::CursorEnd => {
-                    self.state.cursor = self.state.input_message.len();
-                }
-                AppEvent::CursorRight => {
-                    if self.state.cursor < self.state.input_message.len() {
-                        self.state.cursor += 1;
-                    }
-                }
-                AppEvent::CursorLeft => {
-                    if self.state.cursor > 0 {
-                        self.state.cursor -= 1;
-                    }
-                }
-                _ => {}
+                else => break,
+            }
+        }
+
+        while let Some(msg) = self.network_consumer.recv().await {
+            match msg {
+                NetworkEvent::Message(payload) => self
+                    .state
+                    .messages
+                    .push(Message::new(String::from_utf8(payload)?)),
             }
             self.renderer.render(&self.state)?;
         }
@@ -97,7 +135,8 @@ mod should {
         let renderer_mock = setup_rendered_mock();
 
         let (_, receiver) = mpsc::channel(1);
-        let _ = App::new(receiver, renderer_mock);
+        let (publisher, consumer) = mpsc::channel(1);
+        let _ = App::new(receiver, renderer_mock, publisher, consumer);
     }
 
     #[test_case(
@@ -109,32 +148,6 @@ mod should {
             ..Default::default()
         }]
         ; "single character")]
-    #[test_case(
-        State::default(),
-        vec![
-            AppEvent::Character('m'),
-            AppEvent::Character('e'),
-            AppEvent::Accept,
-        ],
-        vec![
-            State {
-                input_message: "m".into(),
-                cursor: 1,
-                ..Default::default()
-            },
-            State {
-                input_message: "me".into(),
-                cursor: 2,
-                ..Default::default()
-            },
-            State {
-                input_message: "".into(),
-                cursor: 0,
-                messages: vec![ Message::new("me".into()) ],
-                ..Default::default()
-            },
-        ]
-        ; "on accept push input to messages")]
     #[test_case(
         State::default(),
         vec![
@@ -259,8 +272,13 @@ mod should {
         }
 
         let (sender, receiver) = mpsc::channel(1);
-        let mut tested_app = App::new(receiver, renderer_mock);
+        let (publisher, publisher_mock) = mpsc::channel(1);
+        let (consumer_mock, consumer) = mpsc::channel(1);
+        let mut tested_app = App::new(receiver, renderer_mock, publisher, consumer);
         tested_app.state = init_state;
+
+        drop(consumer_mock);
+        drop(publisher_mock);
 
         task::spawn(async move {
             for event in events {
@@ -272,6 +290,110 @@ mod should {
             tested_app.run().await.unwrap();
         })
         .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn on_accept_send_message_to_network() {
+        let init_state = State::default();
+        let events = vec![
+            AppEvent::Character('m'),
+            AppEvent::Character('e'),
+            AppEvent::Accept,
+        ];
+        let expected_states = vec![
+            State {
+                input_message: "m".into(),
+                cursor: 1,
+                ..Default::default()
+            },
+            State {
+                input_message: "me".into(),
+                cursor: 2,
+                ..Default::default()
+            },
+            State {
+                input_message: "".into(),
+                cursor: 0,
+                messages: vec![Message::new("me".into())],
+                ..Default::default()
+            },
+        ];
+
+        let mut seq = Sequence::new();
+        let mut renderer_mock = setup_rendered_mock();
+        for s in expected_states {
+            renderer_mock
+                .expect_render()
+                .times(1)
+                .with(eq(s))
+                .in_sequence(&mut seq)
+                .returning(|_| Ok(()));
+        }
+
+        let (sender, receiver) = mpsc::channel(1);
+        let (publisher, mut publisher_mock) = mpsc::channel(1);
+        let (consumer_mock, consumer) = mpsc::channel(1);
+        let mut tested_app = App::new(receiver, renderer_mock, publisher, consumer);
+        tested_app.state = init_state;
+
+        drop(consumer_mock);
+
+        tokio::try_join!(
+            tokio::time::timeout(Duration::from_millis(100), async move {
+                tested_app.run().await.unwrap();
+            }),
+            tokio::time::timeout(Duration::from_millis(100), async move {
+                let msg = publisher_mock.recv().await;
+                assert_eq!(msg, Some(NetworkEvent::Message("me".as_bytes().to_owned())));
+            }),
+            tokio::time::timeout(Duration::from_millis(100), async move {
+                for event in events {
+                    sender.send(event).await.unwrap();
+                }
+            })
+        )
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn handle_network_message() {
+        let mut seq = Sequence::new();
+        let mut renderer_mock = setup_rendered_mock();
+        for s in vec![State {
+            messages: vec![Message::new("Hi".into())],
+            ..Default::default()
+        }] {
+            renderer_mock
+                .expect_render()
+                .times(1)
+                .with(eq(s))
+                .in_sequence(&mut seq)
+                .returning(|_| Ok(()));
+        }
+
+        let (sender, receiver) = mpsc::channel(1);
+        let (publisher, publisher_mock) = mpsc::channel(1);
+
+        let network_events = vec![NetworkEvent::Message("Hi".as_bytes().to_owned())];
+        let (consumer_mock, consumer) = mpsc::channel(network_events.len());
+        let consumer_mock = async move {
+            for event in network_events {
+                consumer_mock.send(event).await.unwrap();
+            }
+        };
+
+        let mut tested_app = App::new(receiver, renderer_mock, publisher, consumer);
+
+        drop(sender);
+        drop(publisher_mock);
+
+        tokio::try_join!(
+            tokio::time::timeout(Duration::from_millis(100), async move {
+                tested_app.run().await.unwrap();
+            }),
+            tokio::time::timeout(Duration::from_millis(100), consumer_mock)
+        )
         .unwrap();
     }
 
@@ -314,8 +436,13 @@ mod should {
         }
 
         let (sender, receiver) = mpsc::channel(1);
-        let mut tested_app = App::new(receiver, renderer_mock);
+        let (publisher, publisher_mock) = mpsc::channel(1);
+        let (consumer_mock, consumer) = mpsc::channel(1);
+        let mut tested_app = App::new(receiver, renderer_mock, publisher, consumer);
         tested_app.state = init_state;
+
+        drop(consumer_mock);
+        drop(publisher_mock);
 
         task::spawn(async move {
             for event in events {
@@ -337,7 +464,12 @@ mod should {
         let renderer_mock = setup_rendered_mock();
 
         let (sender, receiver) = mpsc::channel(1);
-        let mut tested_app = App::new(receiver, renderer_mock);
+        let (publisher, publisher_mock) = mpsc::channel(1);
+        let (consumer_mock, consumer) = mpsc::channel(1);
+        let mut tested_app = App::new(receiver, renderer_mock, publisher, consumer);
+
+        drop(consumer_mock);
+        drop(publisher_mock);
 
         let test_sender = sender.clone();
         task::spawn(async move {
