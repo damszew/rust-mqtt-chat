@@ -8,7 +8,7 @@ mod publisher;
 
 const CHANNEL_BUFFER: usize = 1;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum NetworkEvent {
     Message(Vec<u8>),
 }
