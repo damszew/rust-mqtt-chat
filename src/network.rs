@@ -3,7 +3,6 @@ use paho_mqtt::{AsyncClient, ConnectOptionsBuilder, CreateOptionsBuilder};
 use tokio::sync::mpsc;
 
 // TODO: add Mqtt prefix to module names
-mod consumer;
 mod publisher;
 
 const CHANNEL_BUFFER: usize = 1;
@@ -29,7 +28,7 @@ pub async fn network(
         .keep_alive_interval(std::time::Duration::from_secs(30))
         .finalize();
 
-    let mqtt_receiver = mqtt_client.get_stream(1);
+    let _ = mqtt_client.get_stream(1);
 
     mqtt_client.connect(conn_opts).await?;
 
@@ -50,12 +49,7 @@ pub async fn network(
     };
 
     let consumer_receiver = {
-        let (consumer_sender, consumer_receiver) = mpsc::channel(CHANNEL_BUFFER);
-        let mut consumer = consumer::MqttConsumer {
-            mqtt_receiver,
-            subscribers: vec![consumer_sender],
-        };
-        tokio::spawn(async move { consumer.run().await });
+        let (_, consumer_receiver) = mpsc::channel(CHANNEL_BUFFER);
         consumer_receiver
     };
 
