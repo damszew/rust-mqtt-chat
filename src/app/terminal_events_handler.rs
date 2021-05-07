@@ -66,6 +66,7 @@ impl TerminalEventsHandler {
         }
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
