@@ -9,7 +9,7 @@ pub trait EventsReader {
 
     async fn subscribe<F>(&mut self, callback: F)
     where
-        F: Fn(Self::Message) -> () + Send + 'static;
+        F: Fn(Self::Message) + Send + 'static;
 
     async fn run(&mut self) -> Result<()>;
 }

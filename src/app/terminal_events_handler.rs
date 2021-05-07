@@ -25,7 +25,7 @@ impl TerminalEventsHandler {
             }
             AppEvent::Accept => {
                 let message = state.input_message.drain(..).collect::<String>();
-                let message = Message::new(message.clone());
+                let message = Message::new(message);
 
                 state.cursor = 0;
                 state.messages.push(message);

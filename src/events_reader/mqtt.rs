@@ -8,7 +8,7 @@ use super::EventsReader;
 
 pub struct MqttEventsReader {
     pub receiver: Receiver<Option<Message>>,
-    pub subscribers: Vec<Box<dyn Fn(NetworkEvent) -> () + Send + 'static>>,
+    pub subscribers: Vec<Box<dyn Fn(NetworkEvent) + Send + 'static>>,
 }
 
 impl MqttEventsReader {
@@ -26,7 +26,7 @@ impl EventsReader for MqttEventsReader {
 
     async fn subscribe<F>(&mut self, callback: F)
     where
-        F: Fn(Self::Message) -> () + Send + 'static,
+        F: Fn(Self::Message) + Send + 'static,
     {
         self.subscribers.push(Box::new(callback));
     }

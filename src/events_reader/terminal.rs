@@ -8,7 +8,7 @@ pub struct CrosstermEventsHandler<S>
 where
     S: Stream,
 {
-    subscribers: Vec<Box<dyn Fn(AppEvent) -> () + Send + 'static>>,
+    subscribers: Vec<Box<dyn Fn(AppEvent) + Send + 'static>>,
     event_stream: S, // TODO: Try to make it `Fuse`
 }
 
@@ -23,6 +23,12 @@ impl CrosstermEventsHandler<EventStream> {
     }
 }
 
+impl Default for CrosstermEventsHandler<EventStream> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait::async_trait]
 impl<S> EventsReader for CrosstermEventsHandler<S>
 where
@@ -32,7 +38,7 @@ where
 
     async fn subscribe<F>(&mut self, callback: F)
     where
-        F: Fn(Self::Message) -> () + Send + 'static,
+        F: Fn(Self::Message) + Send + 'static,
     {
         self.subscribers.push(Box::new(callback));
     }
