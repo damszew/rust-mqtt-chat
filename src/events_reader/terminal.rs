@@ -2,7 +2,7 @@ use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyModifiers};
 use futures::{Stream, StreamExt};
 
 use super::EventsReader;
-use crate::AppEvent;
+use crate::{app, AppEvent};
 
 pub struct CrosstermEventsHandler<S>
 where
@@ -20,6 +20,17 @@ impl CrosstermEventsHandler<EventStream> {
             subscribers: Vec::new(),
             event_stream,
         }
+    }
+}
+
+impl<S> CrosstermEventsHandler<S>
+where
+    S: Stream,
+{
+    fn notify_subscribers(&self, event: AppEvent) {
+        self.subscribers
+            .iter()
+            .for_each(|subscriber| subscriber(event.clone()));
     }
 }
 
@@ -47,74 +58,32 @@ where
         while let Some(event) = self.event_stream.next().await {
             let event = event?;
             if let Event::Key(KeyEvent { code, modifiers }) = event {
-                match code {
-                    KeyCode::Esc => {
-                        self.subscribers
-                            .iter()
-                            .for_each(|subscriber| subscriber(AppEvent::Quit));
-                        break;
-                    }
+                let app_event = match code {
+                    KeyCode::Esc => Some(AppEvent::Quit),
                     KeyCode::Char(c) => {
                         if c == 'c' && modifiers == KeyModifiers::CONTROL {
-                            self.subscribers
-                                .iter()
-                                .for_each(|subscriber| subscriber(AppEvent::Quit));
-                            break;
+                            Some(AppEvent::Quit)
                         } else {
-                            self.subscribers
-                                .iter()
-                                .for_each(|subscriber| subscriber(AppEvent::Character(c)));
+                            Some(AppEvent::Character(c))
                         }
                     }
-                    KeyCode::Enter => {
-                        self.subscribers
-                            .iter()
-                            .for_each(|subscriber| subscriber(AppEvent::Accept));
-                    }
-                    KeyCode::Delete => {
-                        self.subscribers
-                            .iter()
-                            .for_each(|subscriber| subscriber(AppEvent::Remove));
-                    }
-                    KeyCode::Backspace => {
-                        self.subscribers
-                            .iter()
-                            .for_each(|subscriber| subscriber(AppEvent::RemoveLast));
-                    }
-                    KeyCode::Left => {
-                        self.subscribers
-                            .iter()
-                            .for_each(|subscriber| subscriber(AppEvent::CursorLeft));
-                    }
-                    KeyCode::Right => {
-                        self.subscribers
-                            .iter()
-                            .for_each(|subscriber| subscriber(AppEvent::CursorRight));
-                    }
-                    KeyCode::Home => {
-                        self.subscribers
-                            .iter()
-                            .for_each(|subscriber| subscriber(AppEvent::CursorStart));
-                    }
-                    KeyCode::End => {
-                        self.subscribers
-                            .iter()
-                            .for_each(|subscriber| subscriber(AppEvent::CursorEnd));
-                    }
+                    KeyCode::Enter => Some(AppEvent::Accept),
+                    KeyCode::Delete => Some(AppEvent::Remove),
+                    KeyCode::Backspace => Some(AppEvent::RemoveLast),
+                    KeyCode::Left => Some(AppEvent::CursorLeft),
+                    KeyCode::Right => Some(AppEvent::CursorRight),
+                    KeyCode::Home => Some(AppEvent::CursorStart),
+                    KeyCode::End => Some(AppEvent::CursorEnd),
 
-                    KeyCode::Up => {
-                        self.subscribers
-                            .iter()
-                            .for_each(|subscriber| subscriber(AppEvent::ScrollUp));
-                    }
-                    KeyCode::Down => {
-                        self.subscribers
-                            .iter()
-                            .for_each(|subscriber| subscriber(AppEvent::ScrollDown));
-                    }
-                    _ => {}
+                    KeyCode::Up => Some(AppEvent::ScrollUp),
+                    KeyCode::Down => Some(AppEvent::ScrollDown),
+                    _ => None, // Ignore other events
+                };
+
+                if let Some(event) = app_event {
+                    self.notify_subscribers(event);
                 }
-            } // Ignore other events
+            }
         }
 
         Ok(())
@@ -132,14 +101,8 @@ mod tests {
     #[test_case( KeyCode::Esc, KeyModifiers::NONE ; "on esc")]
     #[test_case( KeyCode::Char('c'), KeyModifiers::CONTROL ; "on ctrl c")]
     #[tokio::test]
-    async fn quit_and_shutdown(exit_key: KeyCode, modifier: KeyModifiers) {
-        let stream = tokio_stream::iter(vec![
-            Ok(Event::Key(KeyEvent::new(exit_key, modifier))),
-            Err(crossterm::ErrorKind::IoError(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "oh no!",
-            ))),
-        ]);
+    async fn send_quit(exit_key: KeyCode, modifier: KeyModifiers) {
+        let stream = tokio_stream::iter(vec![Ok(Event::Key(KeyEvent::new(exit_key, modifier)))]);
 
         let mut tested_event_handler = CrosstermEventsHandler {
             event_stream: stream,
