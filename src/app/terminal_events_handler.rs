@@ -1,16 +1,28 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
+    events_publisher::EventsPublisher,
+    network::NetworkEvent,
     renderer::{Message, State},
     AppEvent,
 };
 
-pub struct TerminalEventsHandler {
+pub struct TerminalEventsHandler<EP>
+where
+    EP: EventsPublisher<Message = NetworkEvent>,
+{
     state: Arc<Mutex<State>>,
+    events_publisher: EP,
 }
-impl TerminalEventsHandler {
-    pub fn new(state: Arc<Mutex<State>>) -> Self {
-        Self { state }
+impl<EP> TerminalEventsHandler<EP>
+where
+    EP: EventsPublisher<Message = NetworkEvent>,
+{
+    pub fn new(state: Arc<Mutex<State>>, events_publisher: EP) -> Self {
+        Self {
+            state,
+            events_publisher,
+        }
     }
     pub fn handle(&self, message: AppEvent) {
         let mut state = self.state.lock().unwrap();
@@ -25,13 +37,13 @@ impl TerminalEventsHandler {
             }
             AppEvent::Accept => {
                 let message = state.input_message.drain(..).collect::<String>();
-                let message = Message::new(message);
+
+                self.events_publisher
+                    .publish(NetworkEvent::Message(message.as_bytes().to_owned()))
+                    .unwrap();
 
                 state.cursor = 0;
-                state.messages.push(message);
-                // self.network_publisher
-                //     .send(NetworkEvent::Message(message.as_bytes().to_owned()))
-                //     .await?;
+                state.messages.push(Message::new(message));
             }
             AppEvent::Remove => {
                 if state.cursor < state.input_message.len() {
@@ -69,8 +81,11 @@ impl TerminalEventsHandler {
 
 #[cfg(test)]
 mod tests {
+    use crate::{events_publisher::EventsPublisher, network::NetworkEvent};
+
     use super::*;
 
+    use mockall::predicate::*;
     use test_case::test_case;
 
     #[test_case(
@@ -276,7 +291,9 @@ mod tests {
         events: Vec<AppEvent>,
     ) -> State {
         let state = Arc::new(Mutex::new(init_state));
-        let tested_handler = TerminalEventsHandler::new(state.clone());
+
+        let events_publisher_mock = MockEventsPublisher::new();
+        let tested_handler = TerminalEventsHandler::new(state.clone(), events_publisher_mock);
 
         for event in events {
             tested_handler.handle(event);
@@ -284,5 +301,49 @@ mod tests {
 
         let result = state.lock().unwrap().clone();
         result
+    }
+
+    #[tokio::test]
+    async fn send_message_on_accept() {
+        let init_state = State {
+            input_message: "some message".into(),
+            cursor: 12,
+            ..Default::default()
+        };
+        let events = vec![AppEvent::Accept];
+        let expected_state = State {
+            input_message: "".into(),
+            cursor: 0,
+            messages: vec![Message::new("some message".into())],
+            ..Default::default()
+        };
+
+        let state = Arc::new(Mutex::new(init_state));
+
+        let mut events_publisher_mock = MockEventsPublisher::new();
+        events_publisher_mock
+            .expect_publish()
+            .with(eq(NetworkEvent::Message("some message".into())))
+            .once()
+            .returning(|_| Ok(()));
+
+        let tested_handler = TerminalEventsHandler::new(state.clone(), events_publisher_mock);
+
+        for event in events {
+            tested_handler.handle(event);
+        }
+
+        let result = state.lock().unwrap().clone();
+        assert_eq!(result, expected_state);
+    }
+
+    mockall::mock! {
+        EventsPublisher {}
+
+        impl EventsPublisher for EventsPublisher {
+            type Message = NetworkEvent;
+
+            fn publish(&self, message: NetworkEvent) -> anyhow::Result<()>;
+        }
     }
 }

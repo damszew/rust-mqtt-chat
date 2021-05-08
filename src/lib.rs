@@ -1,4 +1,5 @@
 pub mod app;
+pub mod events_publisher;
 pub mod events_reader;
 pub mod network;
 pub mod renderer;

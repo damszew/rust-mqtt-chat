@@ -10,6 +10,7 @@ use network_events_handler::NetworkEventsHandler;
 use terminal_events_handler::TerminalEventsHandler;
 
 use crate::{
+    events_publisher::EventsPublisher,
     events_reader::EventsReader,
     network::NetworkEvent,
     renderer::{Renderer, State},
@@ -34,7 +35,15 @@ where
     NE: EventsReader<Message = NetworkEvent> + Send,
     TE: EventsReader<Message = AppEvent> + Send,
 {
-    pub async fn new(mut network_events: NE, mut terminal_events: TE, renderer: R) -> Self {
+    pub async fn new<EP>(
+        mut network_events: NE,
+        mut terminal_events: TE,
+        renderer: R,
+        events_publisher: EP,
+    ) -> Self
+    where
+        EP: EventsPublisher<Message = NetworkEvent> + Send + 'static,
+    {
         let state = Arc::new(Mutex::new(State::default()));
 
         let ne_handler = NetworkEventsHandler::new(state.clone());
@@ -44,7 +53,7 @@ where
             })
             .await;
 
-        let te_handler = TerminalEventsHandler::new(state.clone());
+        let te_handler = TerminalEventsHandler::new(state.clone(), events_publisher);
         terminal_events
             .subscribe(move |message| {
                 te_handler.handle(message);
@@ -107,7 +116,15 @@ mod should {
         let mut terminal_events_mock = MockTerminalEventsReaderMock::new();
         terminal_events_mock.expect_subscribe().return_const(());
 
-        let _ = App::new(network_events_mock, terminal_events_mock, renderer_mock).await;
+        let events_publisher_mock = MockEventsPublisher::new();
+
+        let _ = App::new(
+            network_events_mock,
+            terminal_events_mock,
+            renderer_mock,
+            events_publisher_mock,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -124,7 +141,15 @@ mod should {
             .once()
             .return_const(());
 
-        let _ = App::new(network_events_mock, terminal_events_mock, renderer_mock).await;
+        let events_publisher_mock = MockEventsPublisher::new();
+
+        let _ = App::new(
+            network_events_mock,
+            terminal_events_mock,
+            renderer_mock,
+            events_publisher_mock,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -146,8 +171,15 @@ mod should {
             .once()
             .returning(|| Ok(()));
 
-        let mut tested_app =
-            App::new(network_events_mock, terminal_events_mock, renderer_mock).await;
+        let events_publisher_mock = MockEventsPublisher::new();
+
+        let mut tested_app = App::new(
+            network_events_mock,
+            terminal_events_mock,
+            renderer_mock,
+            events_publisher_mock,
+        )
+        .await;
 
         let _ = tokio::time::timeout(Duration::from_millis(100), async move {
             tested_app.run().await.unwrap();
@@ -171,8 +203,15 @@ mod should {
         terminal_events_mock.expect_subscribe().return_const(());
         terminal_events_mock.expect_run().returning(|| Ok(()));
 
-        let mut tested_app =
-            App::new(network_events_mock, terminal_events_mock, renderer_mock).await;
+        let events_publisher_mock = MockEventsPublisher::new();
+
+        let mut tested_app = App::new(
+            network_events_mock,
+            terminal_events_mock,
+            renderer_mock,
+            events_publisher_mock,
+        )
+        .await;
 
         let _ = tokio::time::timeout(Duration::from_millis(100), async move {
             tested_app.run().await.unwrap();
@@ -196,8 +235,15 @@ mod should {
         terminal_events_mock.expect_subscribe().return_const(());
         terminal_events_mock.expect_run().returning(|| Ok(()));
 
-        let mut tested_app =
-            App::new(network_events_mock, terminal_events_mock, renderer_mock).await;
+        let events_publisher_mock = MockEventsPublisher::new();
+
+        let mut tested_app = App::new(
+            network_events_mock,
+            terminal_events_mock,
+            renderer_mock,
+            events_publisher_mock,
+        )
+        .await;
 
         let _ = tokio::time::timeout(Duration::from_millis(500), async move {
             tested_app.run().await.unwrap();
@@ -218,8 +264,15 @@ mod should {
         terminal_events_mock.expect_subscribe().return_const(());
         terminal_events_mock.expect_run().returning(|| Ok(()));
 
-        let mut tested_app =
-            App::new(network_events_mock, terminal_events_mock, renderer_mock).await;
+        let events_publisher_mock = MockEventsPublisher::new();
+
+        let mut tested_app = App::new(
+            network_events_mock,
+            terminal_events_mock,
+            renderer_mock,
+            events_publisher_mock,
+        )
+        .await;
 
         tested_app.state.lock().unwrap().quit = true;
 
@@ -258,6 +311,16 @@ mod should {
                 F: Fn(AppEvent) -> () + Send + 'static;
 
             async fn run(&mut self) -> Result<()>;
+        }
+    }
+
+    mockall::mock! {
+        EventsPublisher {}
+
+        impl EventsPublisher for EventsPublisher {
+            type Message = NetworkEvent;
+
+            fn publish(&self, message: NetworkEvent) -> anyhow::Result<()>;
         }
     }
 }

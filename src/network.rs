@@ -2,9 +2,6 @@ use anyhow::Result;
 use paho_mqtt::{AsyncClient, ConnectOptionsBuilder, CreateOptionsBuilder};
 use tokio::sync::mpsc;
 
-// TODO: add Mqtt prefix to module names
-mod publisher;
-
 const CHANNEL_BUFFER: usize = 1;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -35,16 +32,10 @@ pub async fn network(
     let sub_topic = format!("{}/{}/#", topic_prefix, chat_room);
     mqtt_client.subscribe(&sub_topic, 0).wait()?;
 
-    let topic = format!("{}/{}/user", topic_prefix, chat_room);
+    let _ = format!("{}/{}/user", topic_prefix, chat_room);
 
     let publisher_sender = {
-        let (publisher_sender, publisher_receiver) = mpsc::channel(CHANNEL_BUFFER);
-        let mut publisher = publisher::MqttPublisher {
-            mqtt_client,
-            topic,
-            publishers: publisher_receiver,
-        };
-        tokio::spawn(async move { publisher.run().await });
+        let (publisher_sender, _) = mpsc::channel(CHANNEL_BUFFER);
         publisher_sender
     };
 
