@@ -79,7 +79,7 @@ where
                 {
                     let state = rendering_state.lock().unwrap();
                     if state.quit {
-                        return Ok(());
+                        return Err::<(), _>(anyhow::anyhow!("quit"));
                     }
                     renderer.render(&state)?;
                 }
@@ -91,7 +91,10 @@ where
 
         match result {
             Ok(_) => Ok(()),
-            Err(err) => Err(err),
+            Err(err) => match err.downcast_ref::<&str>() {
+                Some(&"quit") => Ok(()),
+                _ => Err(err),
+            },
         }
     }
 }
