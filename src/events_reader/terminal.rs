@@ -2,7 +2,7 @@ use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyModifiers};
 use futures::{Stream, StreamExt};
 
 use super::EventsReader;
-use crate::{app, AppEvent};
+use crate::AppEvent;
 
 pub struct CrosstermEventsHandler<S>
 where
