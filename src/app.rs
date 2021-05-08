@@ -69,11 +69,10 @@ where
         let rendering_loop = async {
             loop {
                 let state = rendering_state.lock().unwrap();
-                if let Err(err) = renderer.render(&state) {
-                    // "there's currently no way to "give fut a type", nor a way to explicitly specify the return type of an async block"
-                    // source: https://rust-lang.github.io/async-book/07_workarounds/02_err_in_async_blocks.html
-                    return Err::<(), _>(err);
+                if state.quit {
+                    return Ok(());
                 }
+                renderer.render(&state)?;
                 tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             }
         };
@@ -205,6 +204,32 @@ mod should {
             tested_app.run().await.unwrap();
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn stop_rendering_loop_on_quit() {
+        let mut renderer_mock = MockRenderer::new();
+        renderer_mock.expect_render().returning(|_| Ok(()));
+
+        let mut network_events_mock = MockNetworkEventsReaderMock::new();
+        network_events_mock.expect_subscribe().return_const(());
+        network_events_mock.expect_run().once().returning(|| Ok(()));
+
+        let mut terminal_events_mock = MockTerminalEventsReaderMock::new();
+        terminal_events_mock.expect_subscribe().return_const(());
+        terminal_events_mock.expect_run().returning(|| Ok(()));
+
+        let mut tested_app =
+            App::new(network_events_mock, terminal_events_mock, renderer_mock).await;
+
+        tested_app.state.lock().unwrap().quit = true;
+
+        let result = tokio::time::timeout(Duration::from_millis(100), async move {
+            tested_app.run().await.unwrap();
+        })
+        .await;
+
+        assert!(result.is_ok()); // App finished before timeout
     }
 
     mockall::mock! {

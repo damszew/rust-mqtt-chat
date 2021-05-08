@@ -16,7 +16,7 @@ impl TerminalEventsHandler {
         let mut state = self.state.lock().unwrap();
         match message {
             AppEvent::Quit => {
-                // return Ok(());
+                state.quit = true;
             }
             AppEvent::Character(ch) => {
                 let cursor = state.cursor;
@@ -259,6 +259,17 @@ mod tests {
             ..Default::default()
         }
         ; "do not exceed input message")]
+    #[test_case(
+        State::default(),
+        vec![
+            AppEvent::Quit,
+        ]
+        =>
+        State {
+            quit: true,
+            ..Default::default()
+        }
+        ; "quit")]
     #[tokio::test]
     async fn update_state_based_on_terminal_events(
         init_state: State,
@@ -274,31 +285,4 @@ mod tests {
         let result = state.lock().unwrap().clone();
         result
     }
-
-    // TODO: Add `quit` field to state
-    // #[tokio::test]
-    // async fn exit_loop_on_quit() {
-    //     let event = AppEvent::Quit;
-
-    //     let renderer_mock = setup_rendered_mock();
-
-    //     let (sender, receiver) = mpsc::channel(1);
-    //     let (publisher, publisher_mock) = mpsc::channel(1);
-    //     let (consumer_mock, consumer) = mpsc::channel(1);
-    //     let mut tested_app = App::new(receiver, renderer_mock, publisher, consumer);
-
-    //     drop(consumer_mock);
-    //     drop(publisher_mock);
-
-    //     let test_sender = sender.clone();
-    //     task::spawn(async move {
-    //         test_sender.send(event).await.unwrap();
-    //     });
-
-    //     tokio::time::timeout(Duration::from_millis(100), async move {
-    //         tested_app.run().await.unwrap();
-    //     })
-    //     .await
-    //     .unwrap();
-    // }
 }

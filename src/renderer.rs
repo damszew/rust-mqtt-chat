@@ -8,6 +8,7 @@ pub mod terminal_renderer;
 
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct State {
+    pub quit: bool,
     pub input_message: String,
     pub cursor: usize,
     pub messages: Vec<Message>,
