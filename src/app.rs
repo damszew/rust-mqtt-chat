@@ -34,9 +34,8 @@ where
     NE: EventsReader<Message = NetworkEvent> + Send,
     TE: EventsReader<Message = AppEvent> + Send,
 {
-    pub async fn new(mut network_events: NE, mut terminal_events: TE, mut renderer: R) -> Self {
+    pub async fn new(mut network_events: NE, mut terminal_events: TE, renderer: R) -> Self {
         let state = Arc::new(Mutex::new(State::default()));
-        renderer.render(&state.lock().unwrap()).unwrap();
 
         let ne_handler = NetworkEventsHandler::new(state.clone());
         network_events
@@ -200,7 +199,7 @@ mod should {
         let mut tested_app =
             App::new(network_events_mock, terminal_events_mock, renderer_mock).await;
 
-        let _ = tokio::time::timeout(Duration::from_millis(100), async move {
+        let _ = tokio::time::timeout(Duration::from_millis(500), async move {
             tested_app.run().await.unwrap();
         })
         .await;
