@@ -1,5 +1,7 @@
 use anyhow::Result;
 
+pub mod mqtt;
+
 pub trait EventsPublisher {
     type Message;
 
