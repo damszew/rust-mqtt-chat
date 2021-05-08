@@ -2,13 +2,13 @@ use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyModifiers};
 use futures::{Stream, StreamExt};
 
 use super::EventsReader;
-use crate::AppEvent;
+use crate::TerminalEvent;
 
 pub struct CrosstermEventsHandler<S>
 where
     S: Stream,
 {
-    subscribers: Vec<Box<dyn Fn(AppEvent) + Send + 'static>>,
+    subscribers: Vec<Box<dyn Fn(TerminalEvent) + Send + 'static>>,
     event_stream: S, // TODO: Try to make it `Fuse`
 }
 
@@ -27,7 +27,7 @@ impl<S> CrosstermEventsHandler<S>
 where
     S: Stream,
 {
-    fn notify_subscribers(&self, event: AppEvent) {
+    fn notify_subscribers(&self, event: TerminalEvent) {
         self.subscribers
             .iter()
             .for_each(|subscriber| subscriber(event.clone()));
@@ -45,7 +45,7 @@ impl<S> EventsReader for CrosstermEventsHandler<S>
 where
     S: Stream<Item = crossterm::Result<Event>> + Unpin + Send,
 {
-    type Message = AppEvent;
+    type Message = TerminalEvent;
 
     async fn subscribe<F>(&mut self, callback: F)
     where
@@ -59,24 +59,24 @@ where
             let event = event?;
             if let Event::Key(KeyEvent { code, modifiers }) = event {
                 let app_event = match code {
-                    KeyCode::Esc => Some(AppEvent::Quit),
+                    KeyCode::Esc => Some(TerminalEvent::Quit),
                     KeyCode::Char(c) => {
                         if c == 'c' && modifiers == KeyModifiers::CONTROL {
-                            Some(AppEvent::Quit)
+                            Some(TerminalEvent::Quit)
                         } else {
-                            Some(AppEvent::Character(c))
+                            Some(TerminalEvent::Character(c))
                         }
                     }
-                    KeyCode::Enter => Some(AppEvent::Accept),
-                    KeyCode::Delete => Some(AppEvent::Remove),
-                    KeyCode::Backspace => Some(AppEvent::RemoveLast),
-                    KeyCode::Left => Some(AppEvent::CursorLeft),
-                    KeyCode::Right => Some(AppEvent::CursorRight),
-                    KeyCode::Home => Some(AppEvent::CursorStart),
-                    KeyCode::End => Some(AppEvent::CursorEnd),
+                    KeyCode::Enter => Some(TerminalEvent::Accept),
+                    KeyCode::Delete => Some(TerminalEvent::Remove),
+                    KeyCode::Backspace => Some(TerminalEvent::RemoveLast),
+                    KeyCode::Left => Some(TerminalEvent::CursorLeft),
+                    KeyCode::Right => Some(TerminalEvent::CursorRight),
+                    KeyCode::Home => Some(TerminalEvent::CursorStart),
+                    KeyCode::End => Some(TerminalEvent::CursorEnd),
 
-                    KeyCode::Up => Some(AppEvent::ScrollUp),
-                    KeyCode::Down => Some(AppEvent::ScrollDown),
+                    KeyCode::Up => Some(TerminalEvent::ScrollUp),
+                    KeyCode::Down => Some(TerminalEvent::ScrollDown),
                     _ => None, // Ignore other events
                 };
 
@@ -96,7 +96,7 @@ mod tests {
     use test_case::test_case;
 
     use super::*;
-    use crate::AppEvent;
+    use crate::TerminalEvent;
 
     #[test_case( KeyCode::Esc, KeyModifiers::NONE ; "on esc")]
     #[test_case( KeyCode::Char('c'), KeyModifiers::CONTROL ; "on ctrl c")]
@@ -120,7 +120,7 @@ mod tests {
         let tested_result = tested_event_handler.run().await;
 
         assert!(tested_result.is_ok());
-        assert_eq!(results.lock().unwrap()[0], AppEvent::Quit);
+        assert_eq!(results.lock().unwrap()[0], TerminalEvent::Quit);
     }
 
     #[test_case( 'a', KeyModifiers::NONE ; "lowercase")]
@@ -150,20 +150,20 @@ mod tests {
         let tested_result = tested_event_handler.run().await;
 
         assert!(tested_result.is_ok());
-        assert_eq!(results.lock().unwrap()[0], AppEvent::Character(c));
+        assert_eq!(results.lock().unwrap()[0], TerminalEvent::Character(c));
     }
 
-    #[test_case( KeyCode::Enter => AppEvent::Accept ; "enter")]
-    #[test_case( KeyCode::Delete => AppEvent::Remove ; "delete")]
-    #[test_case( KeyCode::Backspace => AppEvent::RemoveLast ; "backspace")]
-    #[test_case( KeyCode::Left => AppEvent::CursorLeft ; "left")]
-    #[test_case( KeyCode::Right => AppEvent::CursorRight ; "right")]
-    #[test_case( KeyCode::Home => AppEvent::CursorStart ; "home")]
-    #[test_case( KeyCode::End => AppEvent::CursorEnd ; "end")]
-    #[test_case( KeyCode::Up => AppEvent::ScrollUp ; "up")]
-    #[test_case( KeyCode::Down => AppEvent::ScrollDown ; "down")]
+    #[test_case( KeyCode::Enter => TerminalEvent::Accept ; "enter")]
+    #[test_case( KeyCode::Delete => TerminalEvent::Remove ; "delete")]
+    #[test_case( KeyCode::Backspace => TerminalEvent::RemoveLast ; "backspace")]
+    #[test_case( KeyCode::Left => TerminalEvent::CursorLeft ; "left")]
+    #[test_case( KeyCode::Right => TerminalEvent::CursorRight ; "right")]
+    #[test_case( KeyCode::Home => TerminalEvent::CursorStart ; "home")]
+    #[test_case( KeyCode::End => TerminalEvent::CursorEnd ; "end")]
+    #[test_case( KeyCode::Up => TerminalEvent::ScrollUp ; "up")]
+    #[test_case( KeyCode::Down => TerminalEvent::ScrollDown ; "down")]
     #[tokio::test]
-    async fn special_key(key: KeyCode) -> AppEvent {
+    async fn special_key(key: KeyCode) -> TerminalEvent {
         let stream =
             tokio_stream::iter(vec![Ok(Event::Key(KeyEvent::new(key, KeyModifiers::NONE)))]);
 

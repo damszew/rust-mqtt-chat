@@ -5,8 +5,7 @@ pub mod network;
 pub mod renderer;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum AppEvent {
-    // TODO: Rename to TerminalEvents and move to event_handler
+pub enum TerminalEvent {
     Quit,
     Character(char),
     Accept,

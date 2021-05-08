@@ -14,14 +14,14 @@ use crate::{
     events_reader::EventsReader,
     network::NetworkEvent,
     renderer::{Renderer, State},
-    AppEvent,
+    TerminalEvent,
 };
 
 pub struct App<R, NE, TE>
 where
     R: Renderer,
     NE: EventsReader<Message = NetworkEvent>,
-    TE: EventsReader<Message = AppEvent>,
+    TE: EventsReader<Message = TerminalEvent>,
 {
     network_events: NE,
     terminal_events: TE,
@@ -33,7 +33,7 @@ impl<R, NE, TE> App<R, NE, TE>
 where
     R: Renderer + Send,
     NE: EventsReader<Message = NetworkEvent> + Send,
-    TE: EventsReader<Message = AppEvent> + Send,
+    TE: EventsReader<Message = TerminalEvent> + Send,
 {
     pub async fn new<EP>(
         mut network_events: NE,
@@ -309,11 +309,11 @@ mod should {
 
         #[async_trait::async_trait]
         impl EventsReader for TerminalEventsReaderMock {
-            type Message = AppEvent;
+            type Message = TerminalEvent;
 
             async fn subscribe<F>(&mut self, callback: F)
             where
-                F: Fn(AppEvent) -> () + Send + 'static;
+                F: Fn(TerminalEvent) -> () + Send + 'static;
 
             async fn run(&mut self) -> Result<()>;
         }

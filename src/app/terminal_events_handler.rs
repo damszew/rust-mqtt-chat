@@ -1,6 +1,8 @@
 use std::sync::{Arc, Mutex};
 
-use crate::{events_publisher::EventsPublisher, network::NetworkEvent, renderer::State, AppEvent};
+use crate::{
+    events_publisher::EventsPublisher, network::NetworkEvent, renderer::State, TerminalEvent,
+};
 
 pub struct TerminalEventsHandler<EP>
 where
@@ -19,18 +21,18 @@ where
             events_publisher,
         }
     }
-    pub fn handle(&self, message: AppEvent) {
+    pub fn handle(&self, message: TerminalEvent) {
         let mut state = self.state.lock().unwrap();
         match message {
-            AppEvent::Quit => {
+            TerminalEvent::Quit => {
                 state.quit = true;
             }
-            AppEvent::Character(ch) => {
+            TerminalEvent::Character(ch) => {
                 let cursor = state.cursor;
                 state.input_message.insert(cursor, ch);
                 state.cursor += 1;
             }
-            AppEvent::Accept => {
+            TerminalEvent::Accept => {
                 let message = state.input_message.drain(..).collect::<String>();
 
                 self.events_publisher
@@ -39,31 +41,31 @@ where
 
                 state.cursor = 0;
             }
-            AppEvent::Remove => {
+            TerminalEvent::Remove => {
                 if state.cursor < state.input_message.len() {
                     let cursor = state.cursor;
                     state.input_message.remove(cursor);
                 }
             }
-            AppEvent::RemoveLast => {
+            TerminalEvent::RemoveLast => {
                 if state.cursor > 0 {
                     state.cursor -= 1;
                     let cursor = state.cursor;
                     state.input_message.remove(cursor);
                 }
             }
-            AppEvent::CursorStart => {
+            TerminalEvent::CursorStart => {
                 state.cursor = 0;
             }
-            AppEvent::CursorEnd => {
+            TerminalEvent::CursorEnd => {
                 state.cursor = state.input_message.len();
             }
-            AppEvent::CursorRight => {
+            TerminalEvent::CursorRight => {
                 if state.cursor < state.input_message.len() {
                     state.cursor += 1;
                 }
             }
-            AppEvent::CursorLeft => {
+            TerminalEvent::CursorLeft => {
                 if state.cursor > 0 {
                     state.cursor -= 1;
                 }
@@ -85,7 +87,7 @@ mod tests {
     #[test_case(
         State::default(),
         vec![
-            AppEvent::Character('c')
+            TerminalEvent::Character('c')
         ]
         =>
         State {
@@ -101,7 +103,7 @@ mod tests {
             ..Default::default()
         },
         vec![
-            AppEvent::RemoveLast,
+            TerminalEvent::RemoveLast,
         ]
         =>
         State {
@@ -113,7 +115,7 @@ mod tests {
     #[test_case(
         State::default(),
         vec![
-            AppEvent::RemoveLast,
+            TerminalEvent::RemoveLast,
         ]
         =>
         State {
@@ -129,7 +131,7 @@ mod tests {
             ..Default::default()
         },
         vec![
-            AppEvent::RemoveLast,
+            TerminalEvent::RemoveLast,
         ]
         =>
         State {
@@ -145,7 +147,7 @@ mod tests {
             ..Default::default()
         },
         vec![
-            AppEvent::Remove,
+            TerminalEvent::Remove,
         ]
         =>
         State {
@@ -161,7 +163,7 @@ mod tests {
             ..Default::default()
         },
         vec![
-            AppEvent::Remove,
+            TerminalEvent::Remove,
         ]
         =>
         State {
@@ -177,7 +179,7 @@ mod tests {
             ..Default::default()
         },
         vec![
-            AppEvent::Character('!'),
+            TerminalEvent::Character('!'),
         ]
         =>
         State {
@@ -193,7 +195,7 @@ mod tests {
             ..Default::default()
         },
         vec![
-            AppEvent::CursorLeft,
+            TerminalEvent::CursorLeft,
         ]
         =>
         State {
@@ -209,7 +211,7 @@ mod tests {
             ..Default::default()
         },
         vec![
-            AppEvent::CursorRight,
+            TerminalEvent::CursorRight,
         ]
         =>
         State {
@@ -225,7 +227,7 @@ mod tests {
             ..Default::default()
         },
         vec![
-            AppEvent::CursorStart,
+            TerminalEvent::CursorStart,
         ]
         =>
         State {
@@ -241,8 +243,8 @@ mod tests {
             ..Default::default()
         },
         vec![
-            AppEvent::CursorStart,
-            AppEvent::CursorLeft,
+            TerminalEvent::CursorStart,
+            TerminalEvent::CursorLeft,
         ]
         =>
         State {
@@ -258,8 +260,8 @@ mod tests {
             ..Default::default()
         },
         vec![
-            AppEvent::CursorEnd,
-            AppEvent::CursorRight,
+            TerminalEvent::CursorEnd,
+            TerminalEvent::CursorRight,
         ]
         =>
         State {
@@ -271,7 +273,7 @@ mod tests {
     #[test_case(
         State::default(),
         vec![
-            AppEvent::Quit,
+            TerminalEvent::Quit,
         ]
         =>
         State {
@@ -282,7 +284,7 @@ mod tests {
     #[tokio::test]
     async fn update_state_based_on_terminal_events(
         init_state: State,
-        events: Vec<AppEvent>,
+        events: Vec<TerminalEvent>,
     ) -> State {
         let state = Arc::new(Mutex::new(init_state));
 
@@ -304,7 +306,7 @@ mod tests {
             cursor: 12,
             ..Default::default()
         };
-        let events = vec![AppEvent::Accept];
+        let events = vec![TerminalEvent::Accept];
         let expected_state = State {
             input_message: "".into(),
             cursor: 0,
