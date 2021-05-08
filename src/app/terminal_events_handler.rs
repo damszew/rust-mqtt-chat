@@ -43,7 +43,6 @@ where
                     .unwrap();
 
                 state.cursor = 0;
-                state.messages.push(Message::new(message));
             }
             AppEvent::Remove => {
                 if state.cursor < state.input_message.len() {
@@ -314,7 +313,6 @@ mod tests {
         let expected_state = State {
             input_message: "".into(),
             cursor: 0,
-            messages: vec![Message::new("some message".into())],
             ..Default::default()
         };
 

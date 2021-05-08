@@ -4,7 +4,7 @@ mod terminal_events_handler;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-use tokio::try_join;
+use tokio::{select, try_join};
 
 use network_events_handler::NetworkEventsHandler;
 use terminal_events_handler::TerminalEventsHandler;
@@ -76,16 +76,22 @@ where
         let renderer = &mut self.renderer;
         let rendering_loop = async {
             loop {
-                let state = rendering_state.lock().unwrap();
-                if state.quit {
-                    return Ok(());
+                {
+                    let state = rendering_state.lock().unwrap();
+                    if state.quit {
+                        return Ok(());
+                    }
+                    renderer.render(&state)?;
                 }
-                renderer.render(&state)?;
                 tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             }
         };
 
-        let result = try_join!(network_loop, terminal_loop, rendering_loop);
+        let result = select!(
+            r = network_loop => {r},
+            r = terminal_loop => {r},
+            r = rendering_loop => {r}
+        );
 
         match result {
             Ok(_) => Ok(()),
