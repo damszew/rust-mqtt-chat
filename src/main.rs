@@ -6,7 +6,7 @@ use actor_model_chat::{
 };
 use anyhow::Result;
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let (events_publisher, network_events) =
         setup_network("tcp://localhost:1883/", "topic", "chat").await?;

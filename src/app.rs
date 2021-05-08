@@ -4,7 +4,7 @@ mod terminal_events_handler;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-use tokio::{select, try_join};
+use tokio::try_join;
 
 use network_events_handler::NetworkEventsHandler;
 use terminal_events_handler::TerminalEventsHandler;
@@ -83,15 +83,11 @@ where
                     }
                     renderer.render(&state)?;
                 }
-                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(15)).await;
             }
         };
 
-        let result = select!(
-            r = network_loop => {r},
-            r = terminal_loop => {r},
-            r = rendering_loop => {r}
-        );
+        let result = try_join!(network_loop, terminal_loop, rendering_loop);
 
         match result {
             Ok(_) => Ok(()),
@@ -235,7 +231,7 @@ mod should {
 
         let mut network_events_mock = MockNetworkEventsReaderMock::new();
         network_events_mock.expect_subscribe().return_const(());
-        network_events_mock.expect_run().once().returning(|| Ok(()));
+        network_events_mock.expect_run().returning(|| Ok(()));
 
         let mut terminal_events_mock = MockTerminalEventsReaderMock::new();
         terminal_events_mock.expect_subscribe().return_const(());
@@ -264,7 +260,7 @@ mod should {
 
         let mut network_events_mock = MockNetworkEventsReaderMock::new();
         network_events_mock.expect_subscribe().return_const(());
-        network_events_mock.expect_run().once().returning(|| Ok(()));
+        network_events_mock.expect_run().returning(|| Ok(()));
 
         let mut terminal_events_mock = MockTerminalEventsReaderMock::new();
         terminal_events_mock.expect_subscribe().return_const(());

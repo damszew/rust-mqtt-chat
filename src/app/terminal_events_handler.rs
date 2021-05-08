@@ -1,11 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::{
-    events_publisher::EventsPublisher,
-    network::NetworkEvent,
-    renderer::{Message, State},
-    AppEvent,
-};
+use crate::{events_publisher::EventsPublisher, network::NetworkEvent, renderer::State, AppEvent};
 
 pub struct TerminalEventsHandler<EP>
 where
