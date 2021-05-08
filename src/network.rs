@@ -2,18 +2,24 @@ use anyhow::Result;
 use paho_mqtt::{AsyncClient, ConnectOptionsBuilder, CreateOptionsBuilder};
 use tokio::sync::mpsc;
 
-const CHANNEL_BUFFER: usize = 1;
+use crate::{
+    events_publisher::{mqtt::MqttEventsPublisher, EventsPublisher},
+    events_reader::{mqtt::MqttEventsReader, EventsReader},
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum NetworkEvent {
     Message(Vec<u8>),
 }
 
-pub async fn network(
+pub async fn setup_network(
     url: impl Into<String>,
     topic_prefix: impl Into<String>,
     chat_room: impl Into<String>,
-) -> Result<(mpsc::Sender<NetworkEvent>, mpsc::Receiver<NetworkEvent>)> {
+) -> Result<(
+    impl EventsPublisher<Message = NetworkEvent>,
+    impl EventsReader<Message = NetworkEvent>,
+)> {
     // TODO: clean up
     let topic_prefix = topic_prefix.into();
     let chat_room = chat_room.into();
@@ -25,24 +31,24 @@ pub async fn network(
         .keep_alive_interval(std::time::Duration::from_secs(30))
         .finalize();
 
-    let _ = mqtt_client.get_stream(1);
+    let recv = mqtt_client.get_stream(1);
+    let events_reader = MqttEventsReader::new(recv);
 
     mqtt_client.connect(conn_opts).await?;
 
     let sub_topic = format!("{}/{}/#", topic_prefix, chat_room);
     mqtt_client.subscribe(&sub_topic, 0).wait()?;
 
-    let _ = format!("{}/{}/user", topic_prefix, chat_room);
+    let topic = format!("{}/{}/user", topic_prefix, chat_room);
 
-    let publisher_sender = {
-        let (publisher_sender, _) = mpsc::channel(CHANNEL_BUFFER);
-        publisher_sender
-    };
+    let (sender, mut recv) = mpsc::unbounded_channel();
+    let events_publisher = MqttEventsPublisher::new(sender, topic);
 
-    let consumer_receiver = {
-        let (_, consumer_receiver) = mpsc::channel(CHANNEL_BUFFER);
-        consumer_receiver
-    };
+    tokio::spawn(async move {
+        while let Some(message) = recv.recv().await {
+            mqtt_client.publish(message).await.unwrap();
+        }
+    });
 
-    Ok((publisher_sender, consumer_receiver))
+    Ok((events_publisher, events_reader))
 }
