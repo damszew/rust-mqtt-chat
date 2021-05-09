@@ -1,6 +1,6 @@
 # rust-mqtt-chat
 
-This repo contains simple network chat which uses MQTT and is written in Rust. This app was made mainly as a TDD exercise for me, so keep that in mind when using it.
+This repo contains simple MQTT chat with payload encryption written in Rust. This app was made mainly as a TDD exercise for me, so keep that in mind when using it.
 
 > a bug is not an error in logic; it is a test that was not written
 
