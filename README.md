@@ -33,7 +33,7 @@ OPTIONS:
 
 For example:
 ```bash
-cargo run -- --server tcp://localhost:1883 --room kitchen --password pizza --user chef
+cargo run --release -- --server tcp://localhost:1883 --room kitchen --password pizza --user chef
 ```
 
 ## License
