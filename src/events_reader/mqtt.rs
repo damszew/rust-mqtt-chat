@@ -2,26 +2,37 @@ use anyhow::Result;
 use futures::{channel::mpsc::Receiver, StreamExt};
 use paho_mqtt::Message;
 
-use crate::network::NetworkEvent;
+use crate::{crypt::Decrypt, network::NetworkEvent};
 
 use super::EventsReader;
 
-pub struct MqttEventsReader {
-    pub receiver: Receiver<Option<Message>>,
-    pub subscribers: Vec<Box<dyn Fn(NetworkEvent) + Send + 'static>>,
+pub struct MqttEventsReader<D>
+where
+    D: Decrypt,
+{
+    receiver: Receiver<Option<Message>>,
+    decryptor: D,
+    subscribers: Vec<Box<dyn Fn(NetworkEvent) + Send + 'static>>,
 }
 
-impl MqttEventsReader {
-    pub fn new(receiver: Receiver<Option<Message>>) -> Self {
+impl<D> MqttEventsReader<D>
+where
+    D: Decrypt,
+{
+    pub fn new(receiver: Receiver<Option<Message>>, decryptor: D) -> Self {
         Self {
             receiver,
+            decryptor,
             subscribers: Vec::new(),
         }
     }
 }
 
 #[async_trait::async_trait]
-impl EventsReader for MqttEventsReader {
+impl<D> EventsReader for MqttEventsReader<D>
+where
+    D: Decrypt + Send,
+{
     type Message = NetworkEvent;
 
     async fn subscribe<F>(&mut self, callback: F)
@@ -34,6 +45,7 @@ impl EventsReader for MqttEventsReader {
     async fn run(&mut self) -> Result<()> {
         while let Some(Some(message)) = self.receiver.next().await {
             let message = message.payload().to_owned();
+            let message = self.decryptor.decrypt(message)?;
 
             self.subscribers
                 .iter()
@@ -50,6 +62,7 @@ mod tests {
 
     use super::*;
 
+    use crate::crypt::MockDecrypt;
     use test_case::test_case;
 
     #[test_case(vec![
@@ -84,8 +97,9 @@ mod tests {
         expected_messages: Vec<NetworkEvent>,
     ) {
         let network_backend_mock = setup_network_mock(network_messages.into_iter());
+        let decryptor = setup_decryptor_mock();
 
-        let mut tested_consumer = MqttEventsReader::new(network_backend_mock);
+        let mut tested_consumer = MqttEventsReader::new(network_backend_mock, decryptor);
 
         let results = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let sub_results = results.clone();
@@ -108,8 +122,9 @@ mod tests {
         let network_messages = vec![payload.as_bytes().to_owned()];
 
         let network_backend_mock = setup_network_mock(network_messages.into_iter());
+        let decryptor = setup_decryptor_mock();
 
-        let mut tested_consumer = MqttEventsReader::new(network_backend_mock);
+        let mut tested_consumer = MqttEventsReader::new(network_backend_mock, decryptor);
         let (test_subscriber1, test_receiver1) = mpsc::channel();
         tested_consumer
             .subscribe(move |msg| {
@@ -156,5 +171,14 @@ mod tests {
         sender.try_send(None).unwrap();
 
         receiver
+    }
+
+    fn setup_decryptor_mock() -> MockDecrypt {
+        let mut decryptor = MockDecrypt::new();
+        decryptor
+            .expect_decrypt()
+            .times(1..) // some tests receive multiple messages
+            .returning(|s: Vec<u8>| Ok(s));
+        decryptor
     }
 }

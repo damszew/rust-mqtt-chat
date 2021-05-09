@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
     let opt = Opt::from_args();
 
     let (events_publisher, network_events) =
-        setup_network(opt.server, TOPIC_PREFIX, opt.room).await?;
+        setup_network(opt.server, TOPIC_PREFIX, opt.room, opt.user, &opt.password).await?;
     let terminal_events = CrosstermEventsHandler::new();
     let renderer = TerminalRenderer::new(std::io::stdout())?;
 
