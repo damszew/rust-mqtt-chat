@@ -1,4 +1,4 @@
-use actor_model_chat::{
+use rust_mqtt_chat::{
     app::App, events_reader::terminal::CrosstermEventsHandler, network::setup_network,
     renderer::terminal_renderer::TerminalRenderer,
 };
