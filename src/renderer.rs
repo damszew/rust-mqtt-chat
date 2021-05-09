@@ -1,4 +1,4 @@
-mod ui; // TODO: reorganize Renderer/Ui modules
+mod ui;
 
 use anyhow::Result;
 use chrono::{DateTime, Local};
@@ -9,6 +9,7 @@ pub mod terminal_renderer;
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct State {
     pub quit: bool,
+    pub current_user: String,
     pub input_message: String,
     pub cursor: usize,
     pub messages: Vec<Message>,
@@ -16,15 +17,17 @@ pub struct State {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message {
-    pub time: DateTime<Local>,
+    pub user: String,
     pub msg: String,
+    pub time: DateTime<Local>,
 }
 
 impl Message {
-    pub fn new(msg: String) -> Self {
+    pub fn new(user: String, msg: String) -> Self {
         Self {
-            time: Local::now(),
+            user,
             msg,
+            time: Local::now(),
         }
     }
 }
@@ -32,6 +35,7 @@ impl PartialEq for Message {
     fn eq(&self, other: &Self) -> bool {
         self.time.format("%H:%M:%S ").to_string() == other.time.format("%H:%M:%S ").to_string()
             && self.msg == other.msg
+            && self.user == other.user
     }
 }
 

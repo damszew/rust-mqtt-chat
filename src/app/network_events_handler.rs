@@ -1,9 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::{
-    network::NetworkEvent,
-    renderer::{Message, State},
-};
+use crate::{network::NetworkEvent, renderer::State};
 
 pub struct NetworkEventsHandler {
     state: Arc<Mutex<State>>,
@@ -14,12 +11,10 @@ impl NetworkEventsHandler {
     }
     pub fn handle(&self, message: NetworkEvent) {
         match message {
-            NetworkEvent::Message(payload) => self
-                .state
-                .lock()
-                .unwrap()
-                .messages
-                .push(Message::new(String::from_utf8(payload).unwrap())),
+            NetworkEvent::Message(payload) => {
+                let message = serde_json::from_slice(&payload).expect("Received invalid message");
+                self.state.lock().unwrap().messages.push(message);
+            }
         }
     }
 }
@@ -28,16 +23,27 @@ impl NetworkEventsHandler {
 mod tests {
     use super::*;
 
+    use crate::renderer::Message;
+
+    use chrono::{DateTime, Local};
     use test_case::test_case;
 
     #[test_case(
         State::default(),
         vec![
-            NetworkEvent::Message("Hi".into())
+            NetworkEvent::Message(r#"{"user":"Chef","msg":"Hi","time":"2021-05-09T09:00:00+02:00"}"#.into())
         ]
         =>
         State {
-            messages: vec![Message::new("Hi".into())],
+            messages: vec![
+                Message {
+                    user: "Chef".into(),
+                    msg: "Hi".into(),
+                    time: DateTime::parse_from_rfc3339("2021-05-09T09:00:00+02:00")
+                        .unwrap()
+                        .with_timezone(&Local),
+                },
+            ],
             ..Default::default()
         }
         ; "simple message")]

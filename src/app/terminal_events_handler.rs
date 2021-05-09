@@ -1,7 +1,10 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    events_publisher::EventsPublisher, network::NetworkEvent, renderer::State, TerminalEvent,
+    events_publisher::EventsPublisher,
+    network::NetworkEvent,
+    renderer::{Message, State},
+    TerminalEvent,
 };
 
 pub struct TerminalEventsHandler<EP>
@@ -35,8 +38,12 @@ where
             TerminalEvent::Accept => {
                 let message = state.input_message.drain(..).collect::<String>();
                 if !message.is_empty() {
+                    let message =
+                        serde_json::to_vec(&Message::new(state.current_user.clone(), message))
+                            .unwrap();
+
                     self.events_publisher
-                        .publish(NetworkEvent::Message(message.as_bytes().to_owned()))
+                        .publish(NetworkEvent::Message(message))
                         .unwrap();
 
                     state.cursor = 0;
@@ -313,21 +320,29 @@ mod tests {
         let init_state = State {
             input_message: "some message".into(),
             cursor: 12,
+            current_user: "Chef".into(),
             ..Default::default()
         };
         let events = vec![TerminalEvent::Accept];
         let expected_state = State {
             input_message: "".into(),
             cursor: 0,
+            current_user: "Chef".into(),
             ..Default::default()
         };
+        let expected_message = Message::new("Chef".into(), "some message".into());
 
         let state = Arc::new(Mutex::new(init_state));
 
         let mut events_publisher_mock = MockEventsPublisher::new();
         events_publisher_mock
             .expect_publish()
-            .with(eq(NetworkEvent::Message("some message".into())))
+            .withf(move |msg| match msg {
+                NetworkEvent::Message(payload) => {
+                    let message: Message = serde_json::from_slice(&payload).unwrap();
+                    message == expected_message
+                }
+            })
             .once()
             .returning(|_| Ok(()));
 

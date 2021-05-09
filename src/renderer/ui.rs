@@ -1,7 +1,10 @@
+use rand::Rng;
+use rand_pcg::Pcg64;
+use rand_seeder::Seeder;
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Span, Spans, Text},
     widgets::{Block, Borders, Paragraph},
     Frame,
@@ -67,6 +70,13 @@ fn draw_messages_panel(state: &State, frame: &mut Frame<impl Backend>, chunk: Re
         .map(|message| {
             let content = Spans::from(vec![
                 Span::raw(message.time.format("%H:%M:%S ").to_string()),
+                Span::styled(
+                    message.user.clone(),
+                    Style::default()
+                        .fg(get_rbg(&message.user))
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(" "),
                 Span::raw(message.msg.clone()),
             ]);
             content
@@ -76,4 +86,11 @@ fn draw_messages_panel(state: &State, frame: &mut Frame<impl Backend>, chunk: Re
     let messages =
         Paragraph::new(messages).block(Block::default().borders(Borders::ALL).title("Messages"));
     frame.render_widget(messages, chunk);
+}
+
+fn get_rbg(data: &str) -> Color {
+    let mut rng: Pcg64 = Seeder::from(data).make_rng();
+    let (r, g, b) = rng.gen();
+
+    Color::Rgb(r, g, b)
 }

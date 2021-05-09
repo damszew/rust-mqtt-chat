@@ -35,12 +35,25 @@ struct Opt {
 async fn main() -> Result<()> {
     let opt = Opt::from_args();
 
-    let (events_publisher, network_events) =
-        setup_network(opt.server, TOPIC_PREFIX, opt.room, opt.user, &opt.password).await?;
+    let (events_publisher, network_events) = setup_network(
+        opt.server,
+        TOPIC_PREFIX,
+        opt.room,
+        opt.user.clone(),
+        &opt.password,
+    )
+    .await?;
     let terminal_events = CrosstermEventsHandler::new();
     let renderer = TerminalRenderer::new(std::io::stdout())?;
 
-    let mut app = App::new(network_events, terminal_events, renderer, events_publisher).await;
+    let mut app = App::new(
+        opt.user,
+        network_events,
+        terminal_events,
+        renderer,
+        events_publisher,
+    )
+    .await;
 
     app.run().await?;
 

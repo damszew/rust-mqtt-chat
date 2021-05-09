@@ -36,6 +36,7 @@ where
     TE: EventsReader<Message = TerminalEvent> + Send,
 {
     pub async fn new<EP>(
+        user: impl Into<String>,
         mut network_events: NE,
         mut terminal_events: TE,
         renderer: R,
@@ -45,6 +46,7 @@ where
         EP: EventsPublisher<Message = NetworkEvent> + Send + 'static,
     {
         let state = Arc::new(Mutex::new(State::default()));
+        state.lock().unwrap().current_user = user.into();
 
         let ne_handler = NetworkEventsHandler::new(state.clone());
         network_events
@@ -124,6 +126,7 @@ mod should {
         let events_publisher_mock = MockEventsPublisher::new();
 
         let _ = App::new(
+            "user",
             network_events_mock,
             terminal_events_mock,
             renderer_mock,
@@ -149,6 +152,7 @@ mod should {
         let events_publisher_mock = MockEventsPublisher::new();
 
         let _ = App::new(
+            "user",
             network_events_mock,
             terminal_events_mock,
             renderer_mock,
@@ -179,6 +183,7 @@ mod should {
         let events_publisher_mock = MockEventsPublisher::new();
 
         let mut tested_app = App::new(
+            "user",
             network_events_mock,
             terminal_events_mock,
             renderer_mock,
@@ -211,6 +216,7 @@ mod should {
         let events_publisher_mock = MockEventsPublisher::new();
 
         let mut tested_app = App::new(
+            "user",
             network_events_mock,
             terminal_events_mock,
             renderer_mock,
@@ -243,6 +249,7 @@ mod should {
         let events_publisher_mock = MockEventsPublisher::new();
 
         let mut tested_app = App::new(
+            "user",
             network_events_mock,
             terminal_events_mock,
             renderer_mock,
@@ -272,6 +279,7 @@ mod should {
         let events_publisher_mock = MockEventsPublisher::new();
 
         let mut tested_app = App::new(
+            "user",
             network_events_mock,
             terminal_events_mock,
             renderer_mock,

@@ -52,7 +52,6 @@ pub async fn setup_network(
 
     tokio::spawn(async move {
         while let Some(message) = recv.recv().await {
-            // TODO: encrypt
             mqtt_client.publish(message).await.unwrap();
         }
     });
