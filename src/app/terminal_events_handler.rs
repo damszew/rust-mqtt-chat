@@ -34,12 +34,13 @@ where
             }
             TerminalEvent::Accept => {
                 let message = state.input_message.drain(..).collect::<String>();
+                if !message.is_empty() {
+                    self.events_publisher
+                        .publish(NetworkEvent::Message(message.as_bytes().to_owned()))
+                        .unwrap();
 
-                self.events_publisher
-                    .publish(NetworkEvent::Message(message.as_bytes().to_owned()))
-                    .unwrap();
-
-                state.cursor = 0;
+                    state.cursor = 0;
+                }
             }
             TerminalEvent::Remove => {
                 if state.cursor < state.input_message.len() {
@@ -281,6 +282,14 @@ mod tests {
             ..Default::default()
         }
         ; "quit")]
+    #[test_case(
+        State::default(),
+        vec![
+            TerminalEvent::Accept,
+        ]
+        =>
+        State::default()
+        ; "do not send empty line on accept")]
     #[tokio::test]
     async fn update_state_based_on_terminal_events(
         init_state: State,
