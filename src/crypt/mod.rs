@@ -18,3 +18,21 @@ pub trait Decrypt {
     where
         T: AsRef<[u8]> + 'static; // 'static needed only for mocking purposes
 }
+
+#[cfg(test)]
+mockall::mock! {
+
+    pub Crypto {}
+
+    impl Encrypt for Crypto {
+        fn encrypt<T>(&self, data: T) -> Vec<u8>
+        where
+            T: AsRef<[u8]> + 'static;
+    }
+
+    impl Decrypt for Crypto {
+        fn decrypt<T>(&self, data: T) -> Result<Vec<u8>>
+        where
+            T: AsRef<[u8]> + 'static;
+    }
+}

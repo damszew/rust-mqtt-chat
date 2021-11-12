@@ -1,6 +1,7 @@
 type Message = Vec<u8>;
 type Error = anyhow::Error;
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait::async_trait]
 pub trait Queue {
     async fn publish(&self, topic: String, message: Message) -> Result<(), Error>;
