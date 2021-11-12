@@ -8,6 +8,6 @@ pub trait Queue {
     async fn subscribe(&mut self, topic: String) -> Result<(), Error>;
 
     async fn receive(&mut self) -> Result<Message, Error>;
-
-    async fn run(&mut self) -> Result<(), Error>;
 }
+
+pub mod mqtt;
