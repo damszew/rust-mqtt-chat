@@ -5,6 +5,8 @@ pub mod events_reader;
 pub mod network;
 pub mod renderer;
 
+pub mod queue;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum TerminalEvent {
     Quit,
