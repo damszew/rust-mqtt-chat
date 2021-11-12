@@ -11,4 +11,5 @@ pub trait Queue {
     async fn receive(&mut self) -> Result<Message, Error>;
 }
 
+pub mod encrypted_queue;
 pub mod mqtt;
