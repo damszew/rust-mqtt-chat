@@ -5,6 +5,7 @@ pub mod events_reader;
 pub mod network;
 pub mod renderer;
 
+pub mod chat;
 pub mod queue;
 
 #[derive(Clone, Debug, PartialEq)]
