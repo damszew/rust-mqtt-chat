@@ -7,6 +7,7 @@ pub mod renderer;
 
 pub mod chat;
 pub mod queue;
+pub mod ui;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TerminalEvent {
