@@ -29,6 +29,10 @@ impl TerminalUi {
         }
     }
 
+    pub async fn update(&mut self, event: KeyEvent) {
+        self.input_panel.update(event).await
+    }
+
     pub fn draw(&self, frame: &mut Frame<impl Backend>, chunk: Rect) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
