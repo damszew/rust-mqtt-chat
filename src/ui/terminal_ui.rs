@@ -21,8 +21,8 @@ impl<C> TerminalUi<C>
 where
     C: ChatRoom,
 {
-    pub fn new(chat_room: C) -> Self {
-        let msg_panel = MessagesPanel::new();
+    pub fn new(mut chat_room: C) -> Self {
+        let msg_panel = MessagesPanel::new(&mut chat_room);
         let help_msg = HelpMsg::new();
         let input_panel = InputPanel::new(chat_room);
 
