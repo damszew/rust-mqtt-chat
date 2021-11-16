@@ -1,5 +1,5 @@
 use super::{Error, Message, Queue};
-use crate::crypt::{Decrypt, Encrypt};
+use crate::crypto::{Decrypt, Encrypt};
 
 pub struct EncryptedQueue<Q, C> {
     queue: Q,
@@ -41,7 +41,7 @@ where
 mod tests {
     use super::*;
 
-    use crate::crypt::MockCrypto;
+    use crate::crypto::MockCrypto;
     use crate::queue::MockQueue;
 
     #[tokio::test]

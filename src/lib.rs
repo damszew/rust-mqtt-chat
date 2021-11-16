@@ -1,5 +1,5 @@
 pub mod app;
-pub mod crypt;
+pub mod crypto;
 pub mod events_publisher;
 pub mod events_reader;
 pub mod network;

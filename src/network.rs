@@ -3,7 +3,7 @@ use paho_mqtt::{AsyncClient, ConnectOptionsBuilder, CreateOptionsBuilder};
 use tokio::sync::mpsc;
 
 use crate::{
-    crypt::magic_crypt::{MagicDecrypt, MagicEncrypt},
+    crypto::magic_crypt::{MagicDecrypt, MagicEncrypt},
     events_publisher::{mqtt::MqttEventsPublisher, EventsPublisher},
     events_reader::{mqtt::MqttEventsReader, EventsReader},
 };

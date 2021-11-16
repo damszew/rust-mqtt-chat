@@ -2,7 +2,7 @@ use anyhow::Result;
 use futures::{channel::mpsc::Receiver, StreamExt};
 use paho_mqtt::Message;
 
-use crate::{crypt::Decrypt, network::NetworkEvent};
+use crate::{crypto::Decrypt, network::NetworkEvent};
 
 use super::EventsReader;
 
@@ -62,7 +62,7 @@ mod tests {
 
     use super::*;
 
-    use crate::crypt::MockDecrypt;
+    use crate::crypto::MockDecrypt;
     use test_case::test_case;
 
     #[test_case(vec![

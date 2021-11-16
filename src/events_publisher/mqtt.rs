@@ -2,7 +2,7 @@ use anyhow::Result;
 use paho_mqtt::Message;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{crypt::Encrypt, network::NetworkEvent};
+use crate::{crypto::Encrypt, network::NetworkEvent};
 
 use super::EventsPublisher;
 
