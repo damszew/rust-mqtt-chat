@@ -10,7 +10,7 @@ use tui::{
     Frame,
 };
 
-use crate::chat::chat_msg::ChatMessage;
+use crate::chat_room::ChatMessage;
 
 #[derive(Clone, Default, Debug)]
 pub struct MessagesPanel {

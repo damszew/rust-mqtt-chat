@@ -5,7 +5,7 @@ pub mod events_reader;
 pub mod network;
 pub mod renderer;
 
-pub mod chat;
+pub mod chat_room;
 pub mod queue;
 pub mod terminal_driver;
 pub mod ui;
