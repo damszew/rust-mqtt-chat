@@ -12,6 +12,7 @@ pub struct ChatMessage {
     pub time: DateTime<Local>,
 }
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait::async_trait]
 pub trait ChatRoom {
     fn get_messages(&self) -> Vec<ChatMessage>;

@@ -5,22 +5,26 @@ use tui::{
     Frame,
 };
 
+use crate::chat_room::ChatRoom;
+
 use super::components::{
     help_msg::HelpMsg, input_panel::InputPanel, messages_panel::MessagesPanel,
 };
 
-#[derive(Clone, Default, Debug)]
-pub struct TerminalUi {
+pub struct TerminalUi<C> {
     msg_panel: MessagesPanel,
     help_msg: HelpMsg,
-    input_panel: InputPanel,
+    input_panel: InputPanel<C>,
 }
 
-impl TerminalUi {
-    pub fn new() -> Self {
+impl<C> TerminalUi<C>
+where
+    C: ChatRoom,
+{
+    pub fn new(chat_room: C) -> Self {
         let msg_panel = MessagesPanel::new();
         let help_msg = HelpMsg::new();
-        let input_panel = InputPanel::new();
+        let input_panel = InputPanel::new(chat_room);
 
         Self {
             msg_panel,
