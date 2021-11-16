@@ -15,7 +15,9 @@ pub struct ChatMessage {
 #[cfg_attr(test, mockall::automock)]
 #[async_trait::async_trait]
 pub trait ChatRoom {
-    fn get_messages(&self) -> Vec<ChatMessage>;
+    fn on_message<F>(&mut self, callback: F)
+    where
+        F: Fn(ChatMessage) + Send + Sync + 'static;
 
     async fn send(&self, msg: String) -> Result<(), Error>;
 }
