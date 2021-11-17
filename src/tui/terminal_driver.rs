@@ -1,7 +1,7 @@
 use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyModifiers};
 use futures::{FutureExt, StreamExt};
 
-use crate::{chat_room::ChatRoom, ui::components::main_view::MainView};
+use crate::{chat_room::ChatRoom, tui::components::main_view::MainView};
 
 use std::io::Write;
 
