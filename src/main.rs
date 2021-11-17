@@ -1,12 +1,11 @@
 use rust_mqtt_chat::{
-    app::App, events_reader::terminal::CrosstermEventsHandler, network::setup_network,
-    renderer::terminal_renderer::TerminalRenderer,
+    chat_room::queue_chat_room::QueueChatRoom,
+    crypto::magic_crypt::MagicCrypt,
+    queue::{encrypted_queue::EncryptedQueue, mqtt::MqttQueue},
+    terminal_driver::TerminalDriver,
+    ui::terminal_ui::TerminalUi,
 };
-
-use anyhow::Result;
 use structopt::StructOpt;
-
-const TOPIC_PREFIX: &str = "df9ff5c8-c030-4e4a-8bae-a415565febd7";
 
 #[derive(StructOpt)]
 #[structopt(
@@ -32,30 +31,24 @@ struct Opt {
 }
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<()> {
+async fn main() -> Result<(), anyhow::Error> {
     let opt = Opt::from_args();
 
-    let (events_publisher, network_events) = setup_network(
-        opt.server,
-        TOPIC_PREFIX,
-        opt.room,
-        opt.user.clone(),
-        &opt.password,
-    )
-    .await?;
-    let terminal_events = CrosstermEventsHandler::new();
-    let renderer = TerminalRenderer::new(std::io::stdout())?;
+    let queue = MqttQueue::new(opt.server).await?;
 
-    let mut app = App::new(
-        opt.user,
-        network_events,
-        terminal_events,
-        renderer,
-        events_publisher,
-    )
-    .await;
+    let crypto = MagicCrypt::new(&opt.password);
+    let queue = EncryptedQueue::new(queue, crypto);
 
-    app.run().await?;
+    let mut chat_room = QueueChatRoom::new(queue, opt.user, opt.room).await?;
+
+    let ui = TerminalUi::new(chat_room.clone());
+
+    let mut driver = TerminalDriver::new(std::io::stdout())?;
+
+    tokio::select! {
+        r = chat_room.run() => {r?}
+        r = driver.run(ui) => {r?}
+    }
 
     Ok(())
 }
