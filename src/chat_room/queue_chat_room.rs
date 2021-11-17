@@ -79,6 +79,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic;
+
     use super::*;
 
     use crate::queue::MockQueue;
@@ -153,16 +155,16 @@ mod tests {
             .await
             .unwrap();
 
-        let msg_received = std::sync::Arc::new(std::sync::Mutex::new(false));
+        let msg_received = std::sync::Arc::new(atomic::AtomicBool::new(false));
         sut.on_message({
             let msg_received = msg_received.clone();
             move |_| {
-                *msg_received.lock().unwrap() = true;
+                msg_received.store(true, atomic::Ordering::Relaxed);
             }
         });
 
         let _ = tokio::time::timeout(std::time::Duration::from_millis(10), sut.run()).await;
 
-        assert!(*msg_received.lock().unwrap());
+        assert!(msg_received.load(atomic::Ordering::Relaxed));
     }
 }
