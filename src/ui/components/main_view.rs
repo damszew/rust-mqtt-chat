@@ -7,17 +7,15 @@ use tui::{
 
 use crate::chat_room::ChatRoom;
 
-use super::components::{
-    help_msg::HelpMsg, input_panel::InputPanel, messages_panel::MessagesPanel,
-};
+use super::{help_msg::HelpMsg, input_panel::InputPanel, messages_panel::MessagesPanel};
 
-pub struct TerminalUi<C> {
+pub struct MainView<C> {
     msg_panel: MessagesPanel,
     help_msg: HelpMsg,
     input_panel: InputPanel<C>,
 }
 
-impl<C> TerminalUi<C>
+impl<C> MainView<C>
 where
     C: ChatRoom,
 {

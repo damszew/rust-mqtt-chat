@@ -1,7 +1,7 @@
 use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyModifiers};
 use futures::{FutureExt, StreamExt};
 
-use crate::{chat_room::ChatRoom, ui::terminal_ui::TerminalUi};
+use crate::{chat_room::ChatRoom, ui::components::main_view::MainView};
 
 use std::io::Write;
 
@@ -23,7 +23,7 @@ impl<W: Write> TerminalDriver<W> {
         })
     }
 
-    pub async fn run(&mut self, mut ui: TerminalUi<impl ChatRoom>) -> Result<()> {
+    pub async fn run(&mut self, mut ui: MainView<impl ChatRoom>) -> Result<()> {
         let mut event_stream = EventStream::new();
         let timeout = std::time::Duration::from_millis(15);
 
@@ -45,7 +45,7 @@ impl<W: Write> TerminalDriver<W> {
         Ok(())
     }
 
-    fn render(&mut self, ui: &TerminalUi<impl ChatRoom>) -> Result<()> {
+    fn render(&mut self, ui: &MainView<impl ChatRoom>) -> Result<()> {
         self.terminal.draw(|frame| ui.draw(frame, frame.size()))?;
 
         Ok(())

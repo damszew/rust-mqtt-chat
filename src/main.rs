@@ -3,7 +3,7 @@ use rust_mqtt_chat::{
     crypto::magic_crypt::MagicCrypt,
     queue::{encrypted_queue::EncryptedQueue, mqtt::MqttQueue},
     terminal_driver::TerminalDriver,
-    ui::terminal_ui::TerminalUi,
+    ui::components::main_view::MainView,
 };
 use structopt::StructOpt;
 
@@ -41,7 +41,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let mut chat_room = QueueChatRoom::new(queue, opt.user, opt.room).await?;
 
-    let ui = TerminalUi::new(chat_room.clone());
+    let ui = MainView::new(chat_room.clone());
 
     let mut driver = TerminalDriver::new(std::io::stdout())?;
 
