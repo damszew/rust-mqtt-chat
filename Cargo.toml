@@ -5,23 +5,23 @@ authors = ["damszew <damian.szewczyk111@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-anyhow = "1"
-async-trait = "0.1.48"
+anyhow = "1.0.45"
+async-trait = "0.1.51"
 chrono = { version = "0.4.19", features = ["serde"] }
-crossterm = { version = "0.19", default-features = false, features = ["event-stream"] }
-futures = "0.3.14"
-magic-crypt = "3.1.8"
+crossterm = { version = "0.22.1", default-features = false, features = ["event-stream"] }
+futures = "0.3.17"
+magic-crypt = "3.1.9"
 paho-mqtt = "0.9.1"
-rand = "0.8.3"
-rand_pcg = "0.3.0"
+rand = "0.8.4"
+rand_pcg = "0.3.1"
 rand_seeder = "0.2.2"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-structopt = "0.3.21"
-tokio = { version = "1", features = ["full"] }
-tui = { version = "0.14.0", default-features = false, features = ["crossterm"] }
+serde = { version = "1.0.130", features = ["derive"] }
+serde_json = "1.0.70"
+structopt = "0.3.25"
+tokio = { version = "1.14.0", features = ["full"] }
+tui = { version = "0.16.0", default-features = false, features = ["crossterm"] }
 
 [dev-dependencies]
-mockall = "0.9.1"
-tokio-stream = "0.1.5"
-test-case = "1.1.0"
+mockall = "0.10.2"
+tokio-stream = "0.1.8"
+test-case = "1.2.1"
