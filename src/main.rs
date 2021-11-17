@@ -2,8 +2,7 @@ use rust_mqtt_chat::{
     chat_room::queue_chat_room::QueueChatRoom,
     crypto::magic_crypt::MagicCrypt,
     queue::{encrypted_queue::EncryptedQueue, mqtt::MqttQueue},
-    terminal_driver::TerminalDriver,
-    ui::components::main_view::MainView,
+    ui::{components::main_view::MainView, terminal_driver::TerminalDriver},
 };
 use structopt::StructOpt;
 
