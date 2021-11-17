@@ -1,6 +1,7 @@
 use super::{Error, Message, Queue};
 use crate::crypto::{Decrypt, Encrypt};
 
+#[derive(Clone)]
 pub struct EncryptedQueue<Q, C> {
     queue: Q,
     crypto: C,

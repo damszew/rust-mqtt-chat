@@ -1,10 +1,13 @@
-use futures::StreamExt;
+use std::sync::Arc;
+
+use futures::{channel::mpsc, lock::Mutex, StreamExt};
 
 use super::{Error, Message, Queue};
 
+#[derive(Clone)]
 pub struct MqttQueue {
     client: paho_mqtt::AsyncClient,
-    receiver: futures::channel::mpsc::Receiver<Option<paho_mqtt::Message>>,
+    receiver: Arc<Mutex<mpsc::Receiver<Option<paho_mqtt::Message>>>>,
 }
 
 impl MqttQueue {
@@ -13,7 +16,7 @@ impl MqttQueue {
             .server_uri(url)
             .finalize();
         let mut client = paho_mqtt::AsyncClient::new(opts)?;
-        let receiver = client.get_stream(1);
+        let receiver = Arc::new(Mutex::new(client.get_stream(1)));
 
         let conn_opts = paho_mqtt::ConnectOptionsBuilder::new()
             .keep_alive_interval(std::time::Duration::from_secs(30))
@@ -40,8 +43,8 @@ impl Queue for MqttQueue {
     }
 
     async fn receive(&mut self) -> Result<Message, Error> {
-        let msg = self
-            .receiver
+        let mut locked_receiver = self.receiver.lock().await;
+        let msg = locked_receiver
             .next()
             .await
             .ok_or_else(|| anyhow::anyhow!("Error"))?

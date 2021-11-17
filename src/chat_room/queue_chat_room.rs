@@ -1,14 +1,19 @@
-use super::{ChatMessage, ChatRoom};
+use std::sync::{Arc, Mutex};
+
+use anyhow::Context;
+
+use super::{ChatMessage, ChatRoom, Error};
 use crate::queue::Queue;
 
-pub type Error = anyhow::Error;
+type SubscriberCallback = dyn Fn(ChatMessage) + Send + Sync + 'static;
 
 const TOPIC_PREFIX: &str = "df9ff5c8-c030-4e4a-8bae-a415565febd7";
 
+#[derive(Clone)]
 pub struct QueueChatRoom<Q> {
     queue: Q,
     topic: String,
-    subscribers: Vec<Box<dyn Fn(ChatMessage) + Send + Sync + 'static>>,
+    subscribers: Arc<Mutex<Vec<Box<SubscriberCallback>>>>,
 }
 
 impl<Q> QueueChatRoom<Q>
@@ -23,7 +28,7 @@ where
         Ok(Self {
             queue,
             topic,
-            subscribers: Vec::new(),
+            subscribers: Arc::default(),
         })
     }
 
@@ -38,6 +43,8 @@ where
 
     fn notify_subscribers(&self, msg: ChatMessage) {
         self.subscribers
+            .lock()
+            .expect("Poisoned mutex")
             .iter()
             .for_each(|subscriber| subscriber(msg.clone()));
     }
@@ -58,7 +65,10 @@ where
     where
         F: Fn(ChatMessage) + Send + Sync + 'static,
     {
-        self.subscribers.push(Box::new(callback));
+        self.subscribers
+            .lock()
+            .expect("Poisoned mutex")
+            .push(Box::new(callback));
     }
 }
 

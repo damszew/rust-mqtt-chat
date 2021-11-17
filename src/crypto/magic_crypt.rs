@@ -45,6 +45,7 @@ impl Decrypt for MagicDecrypt {
     }
 }
 
+#[derive(Clone)]
 pub struct MagicCrypt {
     crypt: MagicCrypt256,
 }
