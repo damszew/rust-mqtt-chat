@@ -23,7 +23,10 @@ impl<W: Write> TerminalDriver<W> {
         })
     }
 
-    pub async fn run(&mut self, mut ui: MainView<impl ChatRoom>) -> Result<()> {
+    pub async fn run<C>(&mut self, mut ui: MainView<C>) -> Result<()>
+    where
+        C: ChatRoom + Clone,
+    {
         let mut event_stream = EventStream::new();
         let timeout = std::time::Duration::from_millis(15);
 
@@ -45,7 +48,10 @@ impl<W: Write> TerminalDriver<W> {
         Ok(())
     }
 
-    fn render(&mut self, ui: &MainView<impl ChatRoom>) -> Result<()> {
+    fn render<C>(&mut self, ui: &MainView<C>) -> Result<()>
+    where
+        C: ChatRoom + Clone,
+    {
         self.terminal.draw(|frame| ui.draw(frame, frame.size()))?;
 
         Ok(())

@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-
 use rand::Rng;
 use rand_pcg::Pcg64;
 use rand_seeder::Seeder;
@@ -12,32 +10,25 @@ use tui::{
     Frame,
 };
 
-use crate::chat_room::{ChatMessage, ChatRoom};
+use crate::chat_room::ChatRoom;
 
 #[derive(Clone, Default, Debug)]
-pub struct MessagesPanel {
-    messages: Arc<Mutex<Vec<ChatMessage>>>,
+pub struct MessagesPanel<C> {
+    chat_room: C,
 }
 
-impl MessagesPanel {
-    pub fn new(chat_room: &mut impl ChatRoom) -> Self {
-        let messages = Arc::new(Mutex::new(Vec::new()));
-
-        chat_room.on_message({
-            let messages = messages.clone();
-            move |msg| {
-                messages.lock().expect("Poisoned mutex").push(msg);
-            }
-        });
-
-        Self { messages }
+impl<C> MessagesPanel<C>
+where
+    C: ChatRoom,
+{
+    pub fn new(chat_room: C) -> Self {
+        Self { chat_room }
     }
 
     pub fn draw(&self, frame: &mut Frame<impl Backend>, chunk: Rect) {
         let messages = self
-            .messages
-            .lock()
-            .expect("Poisoned mutex")
+            .chat_room
+            .get_messages()
             .iter()
             .map(|message| {
                 let content = Spans::from(vec![

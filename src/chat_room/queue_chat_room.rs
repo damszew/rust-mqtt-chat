@@ -3,8 +3,6 @@ use std::sync::{Arc, Mutex};
 use super::{ChatMessage, ChatRoom, Error};
 use crate::queue::Queue;
 
-type SubscriberCallback = dyn Fn(ChatMessage) + Send + Sync + 'static;
-
 const TOPIC_PREFIX: &str = "df9ff5c8-c030-4e4a-8bae-a415565febd7";
 
 #[derive(Clone)]
@@ -12,7 +10,7 @@ pub struct QueueChatRoom<Q> {
     queue: Q,
     topic: String,
     user_name: String,
-    subscribers: Arc<Mutex<Vec<Box<SubscriberCallback>>>>,
+    messages: Arc<Mutex<Vec<ChatMessage>>>,
 }
 
 impl<Q> QueueChatRoom<Q>
@@ -23,30 +21,24 @@ where
         let topic = format!("{}/{}", TOPIC_PREFIX, room_name); // TODO: Remove tight coupling with mqtt topic format
         queue.subscribe(format!("{}/#", topic)).await?;
 
+        let messages = Arc::new(Mutex::new(Vec::new()));
+
         let topic = format!("{}/{}", topic, user_name);
         Ok(Self {
             queue,
             topic,
             user_name,
-            subscribers: Arc::default(),
+            messages,
         })
     }
 
     pub async fn run(&mut self) -> Result<(), Error> {
         while let Ok(msg) = self.queue.receive().await {
             let msg = serde_json::from_slice(&msg)?;
-            self.notify_subscribers(msg);
+            self.messages.lock().expect("Poisoned mutex").push(msg);
         }
 
         Ok(())
-    }
-
-    fn notify_subscribers(&self, msg: ChatMessage) {
-        self.subscribers
-            .lock()
-            .expect("Poisoned mutex")
-            .iter()
-            .for_each(|subscriber| subscriber(msg.clone()));
     }
 }
 
@@ -66,21 +58,15 @@ where
         self.queue.publish(self.topic.clone(), msg).await
     }
 
-    fn on_message<F>(&mut self, callback: F)
-    where
-        F: Fn(ChatMessage) + Send + Sync + 'static,
-    {
-        self.subscribers
-            .lock()
-            .expect("Poisoned mutex")
-            .push(Box::new(callback));
+    fn get_messages(&self) -> Vec<ChatMessage> {
+        let messages = self.messages.lock().expect("Poisoned mutex");
+
+        messages.to_owned()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic;
-
     use super::*;
 
     use crate::queue::MockQueue;
@@ -135,14 +121,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn should_nofity_when_message_is_received_from_queue() {
+    async fn should_return_received_messages() {
+        let time = chrono::Local::now();
+
         let mut queue_mock = MockQueue::new();
         queue_mock.expect_subscribe().times(1).returning(|_| Ok(()));
-        queue_mock.expect_receive().times(1).returning(|| {
+        queue_mock.expect_receive().times(1).returning(move || {
             Ok(serde_json::to_vec(&ChatMessage {
                 user: "user".into(),
                 msg: "text".into(),
-                time: chrono::Local::now(),
+                time,
             })
             .unwrap())
         });
@@ -155,16 +143,16 @@ mod tests {
             .await
             .unwrap();
 
-        let msg_received = std::sync::Arc::new(atomic::AtomicBool::new(false));
-        sut.on_message({
-            let msg_received = msg_received.clone();
-            move |_| {
-                msg_received.store(true, atomic::Ordering::Relaxed);
-            }
-        });
-
         let _ = tokio::time::timeout(std::time::Duration::from_millis(10), sut.run()).await;
 
-        assert!(msg_received.load(atomic::Ordering::Relaxed));
+        let messages = sut.get_messages();
+        assert_eq!(
+            messages,
+            vec![ChatMessage {
+                user: "user".into(),
+                time,
+                msg: "text".into(),
+            }]
+        );
     }
 }

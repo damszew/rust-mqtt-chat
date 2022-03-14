@@ -8,7 +8,9 @@ edition = "2018"
 anyhow = "1.0.45"
 async-trait = "0.1.51"
 chrono = { version = "0.4.19", features = ["serde"] }
-crossterm = { version = "0.22.1", default-features = false, features = ["event-stream"] }
+crossterm = { version = "0.22.1", default-features = false, features = [
+    "event-stream",
+] }
 futures = "0.3.17"
 magic-crypt = "3.1.9"
 paho-mqtt = "0.9.1"

@@ -10,17 +10,17 @@ use crate::chat_room::ChatRoom;
 use super::{help_msg::HelpMsg, input_panel::InputPanel, messages_panel::MessagesPanel};
 
 pub struct MainView<C> {
-    msg_panel: MessagesPanel,
+    msg_panel: MessagesPanel<C>,
     help_msg: HelpMsg,
     input_panel: InputPanel<C>,
 }
 
 impl<C> MainView<C>
 where
-    C: ChatRoom,
+    C: ChatRoom + Clone,
 {
-    pub fn new(mut chat_room: C) -> Self {
-        let msg_panel = MessagesPanel::new(&mut chat_room);
+    pub fn new(chat_room: C) -> Self {
+        let msg_panel = MessagesPanel::new(chat_room.clone());
         let help_msg = HelpMsg::new();
         let input_panel = InputPanel::new(chat_room);
 
