@@ -1,3 +1,7 @@
+use std::pin::Pin;
+
+use futures::Stream;
+
 type Message = Vec<u8>;
 type Error = anyhow::Error;
 
@@ -8,7 +12,8 @@ pub trait Queue {
 
     async fn subscribe(&mut self, topic: String) -> Result<(), Error>;
 
-    async fn receive(&mut self) -> Result<Message, Error>;
+    // Dynamic dispatch because of error[E0562]: `impl Trait` not allowed outside of function and method return types
+    fn stream(&mut self) -> Pin<Box<dyn Stream<Item = Result<Message, Error>>>>;
 }
 
 pub mod encrypted_queue;

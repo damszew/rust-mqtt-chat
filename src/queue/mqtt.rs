@@ -1,6 +1,6 @@
-use std::sync::Arc;
+use std::{pin::Pin, sync::Arc};
 
-use futures::{channel::mpsc, lock::Mutex, StreamExt};
+use futures::{channel::mpsc, lock::Mutex, Stream, StreamExt};
 
 use super::{Error, Message, Queue};
 
@@ -42,14 +42,13 @@ impl Queue for MqttQueue {
         Ok(())
     }
 
-    async fn receive(&mut self) -> Result<Message, Error> {
-        let mut locked_receiver = self.receiver.lock().await;
-        let msg = locked_receiver
-            .next()
-            .await
-            .ok_or_else(|| anyhow::anyhow!("Error"))?
-            .ok_or_else(|| anyhow::anyhow!("Error"))?;
+    fn stream(&mut self) -> Pin<Box<dyn Stream<Item = Result<Message, Error>>>> {
+        let stream = self
+            .client
+            .get_stream(1)
+            .map(|m| m.map(|msg| msg.payload().to_owned()))
+            .map(|option| option.ok_or_else(|| anyhow::anyhow!("Disconnected")));
 
-        Ok(msg.payload().to_owned())
+        stream.boxed()
     }
 }
