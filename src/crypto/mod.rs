@@ -35,8 +35,4 @@ mockall::mock! {
         where
             T: AsRef<[u8]> + 'static;
     }
-
-    impl Clone for Crypto {
-        fn clone(&self) -> Self;
-    }
 }

@@ -1,7 +1,5 @@
 use std::sync::{Arc, RwLock};
 
-use futures::{future, TryStreamExt};
-
 use super::{ChatMessage, ChatRoom, Error};
 use crate::queue::Queue;
 
@@ -33,16 +31,12 @@ where
     }
 
     pub async fn run(&mut self) -> Result<(), Error> {
-        self.queue
-            .stream()
-            .and_then(
-                |msg| async move { serde_json::from_slice(&msg).map_err(anyhow::Error::from) },
-            )
-            .try_for_each_concurrent(10, |msg| {
-                self.messages.write().expect("Poisoned mutex").push(msg);
-                future::ready(Ok(()))
-            })
-            .await
+        while let Ok(msg) = self.queue.receive().await {
+            let msg = serde_json::from_slice(&msg)?;
+            self.messages.write().expect("Poisoned mutex").push(msg);
+        }
+
+        Ok(())
     }
 }
 
@@ -71,8 +65,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use futures::{stream, StreamExt};
-
     use super::*;
 
     use crate::queue::MockQueue;
@@ -131,19 +123,19 @@ mod tests {
         let time = chrono::Local::now();
 
         let mut queue_mock = MockQueue::new();
-        queue_mock
-            .expect_subscribe()
-            .times(1..)
-            .returning(|_| Ok(()));
-        queue_mock.expect_stream().returning(move || {
-            stream::iter(vec![serde_json::to_vec(&ChatMessage {
+        queue_mock.expect_subscribe().times(1).returning(|_| Ok(()));
+        queue_mock.expect_receive().times(1).returning(move || {
+            Ok(serde_json::to_vec(&ChatMessage {
                 user: "user".into(),
                 msg: "text".into(),
                 time,
             })
-            .map_err(anyhow::Error::from)])
-            .boxed()
+            .unwrap())
         });
+        queue_mock
+            .expect_receive()
+            .times(1)
+            .returning(|| Err(anyhow::anyhow!("finished")));
 
         let mut sut = QueueChatRoom::new(queue_mock, "user".to_string(), "room".to_string())
             .await
