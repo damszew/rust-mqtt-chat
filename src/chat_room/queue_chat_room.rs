@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 use super::{ChatMessage, ChatRoom, Error};
 use crate::queue::Queue;
@@ -10,7 +10,7 @@ pub struct QueueChatRoom<Q> {
     queue: Q,
     topic: String,
     user_name: String,
-    messages: Arc<Mutex<Vec<ChatMessage>>>,
+    messages: Arc<RwLock<Vec<ChatMessage>>>,
 }
 
 impl<Q> QueueChatRoom<Q>
@@ -21,21 +21,19 @@ where
         let topic = format!("{}/{}", TOPIC_PREFIX, room_name); // TODO: Remove tight coupling with mqtt topic format
         queue.subscribe(format!("{}/#", topic)).await?;
 
-        let messages = Arc::new(Mutex::new(Vec::new()));
-
         let topic = format!("{}/{}", topic, user_name);
         Ok(Self {
             queue,
             topic,
             user_name,
-            messages,
+            messages: Arc::default(),
         })
     }
 
     pub async fn run(&mut self) -> Result<(), Error> {
         while let Ok(msg) = self.queue.receive().await {
             let msg = serde_json::from_slice(&msg)?;
-            self.messages.lock().expect("Poisoned mutex").push(msg);
+            self.messages.write().expect("Poisoned mutex").push(msg);
         }
 
         Ok(())
@@ -59,7 +57,7 @@ where
     }
 
     fn get_messages(&self) -> Vec<ChatMessage> {
-        let messages = self.messages.lock().expect("Poisoned mutex");
+        let messages = self.messages.read().expect("Poisoned mutex");
 
         messages.to_owned()
     }
