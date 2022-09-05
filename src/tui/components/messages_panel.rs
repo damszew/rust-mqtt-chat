@@ -31,7 +31,7 @@ where
             .get_messages()
             .iter()
             .map(|message| {
-                let content = Spans::from(vec![
+                Spans::from(vec![
                     Span::raw(message.time.format("%H:%M:%S ").to_string()),
                     Span::styled(
                         message.user.clone(),
@@ -41,8 +41,7 @@ where
                     ),
                     Span::raw(" "),
                     Span::raw(message.msg.clone()),
-                ]);
-                content
+                ])
             })
             .collect::<Vec<_>>();
 
