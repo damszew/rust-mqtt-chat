@@ -6,6 +6,9 @@ on:
 
 name: CI
 
+env:
+  RUST_VERSION: 1.63.0
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -18,14 +21,25 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
       - uses: actions-rs/cargo@v1
         with:
           command: check
-
+          args: --all-targets --all-features
   fmt:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
+          components: rustfmt
       - uses: actions-rs/cargo@v1
         with:
           command: fmt
@@ -43,14 +57,18 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - uses: actions-rs/clippy-check@v1
+      - uses: actions-rs/toolchain@v1
         with:
-          name: clippy results
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: -- -D warnings
+          profile: minimal
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
+          components: clippy
+      - uses: actions-rs/cargo@v1
+        with:
+          command: clippy
 
-  test:
-    needs: [check, fmt, clippy]
+  tests:
+    needs: [clippy]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -61,6 +79,11 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
       - uses: actions-rs/cargo@v1
         with:
           command: test
